@@ -1,0 +1,70 @@
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage[english]{babel}
+\usepackage[margin=1in]{geometry}
+\usepackage{microtype}
+\usepackage{hyperref}
+\usepackage[backend=biber,style=numeric,sorting=none]{biblatex}
+\addbibresource{references.bib}
+
+\begin{document}
+
+\begin{titlepage}
+\centering
+\vspace*{0.18\textheight}
+{\LARGE\bfseries An Ablation Study of Auxiliary Inputs for Lightweight Neural Upscaling in Real-Time Rendering\par}
+\vspace{2.5cm}
+{\large Author One \quad and \quad Author Two\par}
+\vspace{0.5cm}
+{\large Affiliation to be confirmed\par}
+\vfill
+{\large Working manuscript --- \today\par}
+\end{titlepage}
+
+\begin{abstract}
+This manuscript is in preparation. The abstract will be written after the research question, experimental protocol, and results are finalized.
+\end{abstract}
+
+\section{Introduction}
+Neural upscaling reconstructs a higher-resolution image from lower-resolution rendering data. A real-time renderer can also provide auxiliary signals, such as depth and motion vectors, that may help reconstruction. Each additional input has a potential quality benefit and a cost in data preparation, memory, and runtime. This study is planned as a controlled ablation of selected auxiliary inputs for a lightweight upscaler. The exact model, inputs, hardware, and evaluation conditions will be fixed in the experiment protocol before results are collected.
+
+% TODO: Add a source-backed motivation and define lightweight/real-time.
+% TODO: State the final research question and contributions after scope agreement.
+
+\section{Background and Related Work}
+% TODO: Synthesize verified sources by method, auxiliary input, and evaluation setting.
+% Cite a verified entry from references.bib with \cite{CitationKey}.
+This section will compare relevant upscaling methods, rendering buffers, and evaluation practices.
+
+\section{Method}
+\subsection{Research Questions and Study Design}
+The primary planned comparison is between an RGB-only baseline and variants with selected auxiliary inputs under a common model and evaluation setup. The final ablation matrix and its rationale are maintained in the experiment plan until the protocol is fixed.
+
+\subsection{Model, Inputs, and Data}
+% TODO: Specify architecture, input preprocessing, scenes, splits, resolution, and scale.
+The architecture, rendering inputs, and train/test scenes are to be selected.
+
+\subsection{Evaluation Protocol}
+% TODO: Specify baselines, quality metrics, latency/memory measurement, and hardware.
+The measurement protocol will be fixed before final experiments.
+
+\section{Results}
+% TODO: Add tables, figures, run IDs, and uncertainty only after experiments.
+Results have not yet been collected.
+
+\section{Discussion}
+% TODO: Interpret effects and interactions, compare with cited work, and discuss limits.
+This section will interpret quality and runtime tradeoffs after results are available.
+
+\section{Conclusion}
+% TODO: Answer the final research question using measured evidence.
+Conclusions will be written after the analysis.
+
+\clearpage
+\section*{References}
+\addcontentsline{toc}{section}{References}
+\printbibliography[heading=none]
+
+\end{document}

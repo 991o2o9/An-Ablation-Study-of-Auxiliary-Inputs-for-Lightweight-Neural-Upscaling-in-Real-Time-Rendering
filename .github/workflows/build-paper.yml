@@ -1,0 +1,27 @@
+name: Build paper PDF
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out manuscript
+        uses: actions/checkout@v4
+      - name: Compile LaTeX
+        uses: xu-cheng/latex-action@v4
+        with:
+          working_directory: 04_Drafts/paper
+          root_file: main.tex
+      - name: Upload PDF preview
+        uses: actions/upload-artifact@v4
+        with:
+          name: paper-pdf
+          path: 04_Drafts/paper/main.pdf
+          if-no-files-found: error

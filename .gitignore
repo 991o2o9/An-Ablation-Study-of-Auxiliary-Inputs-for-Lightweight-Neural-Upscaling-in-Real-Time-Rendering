@@ -1,0 +1,20 @@
+# LaTeX build products (do not ignore source PDFs in 01_Literature/PDFs/)
+04_Drafts/paper/*.aux
+04_Drafts/paper/*.bbl
+04_Drafts/paper/*.bcf
+04_Drafts/paper/*.blg
+04_Drafts/paper/*.fdb_latexmk
+04_Drafts/paper/*.fls
+04_Drafts/paper/*.log
+04_Drafts/paper/*.out
+04_Drafts/paper/*.run.xml
+04_Drafts/paper/*.synctex.gz
+04_Drafts/paper/*.toc
+04_Drafts/paper/main.pdf
+
+# Local editor files and secrets
+.DS_Store
+*.swp
+*.swo
+.env
+.env.*
