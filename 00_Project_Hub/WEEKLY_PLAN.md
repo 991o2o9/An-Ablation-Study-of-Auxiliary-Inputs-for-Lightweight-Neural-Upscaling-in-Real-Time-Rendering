@@ -10,17 +10,17 @@ The priority this week is a **finished, source-backed Related Work section** in 
 
 | ID | Due | Deliverable / action | Owner | Reviewer | Status |
 |---|---|---|---|---|---|
-| T-001 | Sat 17 Oct | Agree the Related Work outline: neural upscaling methods; auxiliary/temporal inputs; evaluation practice; gap for our ablation | Researcher 1 | Researcher 2 | Not started |
-| T-002 | Sun 18 Oct | Find and verify core neural upscaling and lightweight/real-time rendering sources; enter them in tracker, `references.bib`, and paper notes | Researcher 1 | Researcher 2 | Not started |
-| T-003 | Sun 18 Oct | Find and verify auxiliary-input, temporal reconstruction, and evaluation sources; enter them in tracker, `references.bib`, and paper notes | Researcher 2 | Researcher 1 | Not started |
-| T-004 | Sun 18 Oct | Integrate a complete thematic Related Work draft into `main.tex`, with citations and a closing paragraph stating the research gap | Researcher 1 | Researcher 2 | Not started |
-| T-005 | Mon 19 Oct, before submission | Review every claim against its cited source; flag unsupported claims, missing comparisons, and unclear transitions | Researcher 2 | Researcher 1 | Not started |
-| T-006 | Mon 19 Oct, before submission | Revise Related Work from review comments and confirm both authors accept the final text | Researcher 1 | Researcher 2 | Not started |
-| T-007 | Mon 19 Oct | Replace title-page author placeholders, build/download and inspect the PDF, then send the agreed GitHub link/PDF for the course submission | Researcher 2 | Researcher 1 | Not started |
-| T-008 | Tue 20 Oct | Prepare a short explanation of how the sources lead to the research gap; record questions for the lesson | Researcher 1 | Researcher 2 | Not started |
-| T-009 | Wed 21 Oct, before class | Open the submitted PDF together and confirm the section is ready to discuss | Researcher 2 | Researcher 1 | Not started |
+| T-001 | Sat 17 Oct | Agree the Related Work outline: neural upscaling methods; auxiliary/temporal inputs; evaluation practice; gap for our ablation | Zhanbolot | Amin | Not started |
+| T-002 | Sun 18 Oct | Find and verify core neural upscaling and lightweight/real-time rendering sources; enter them in tracker, `references.bib`, and paper notes | Zhanbolot | Amin | Not started |
+| T-003 | Sun 18 Oct | Find and verify auxiliary-input, temporal reconstruction, and evaluation sources; enter them in tracker, `references.bib`, and paper notes | Amin | Zhanbolot | Not started |
+| T-004 | Sun 18 Oct | Integrate a complete thematic Related Work draft into `main.tex`, with citations and a closing paragraph stating the research gap | Zhanbolot | Amin | Not started |
+| T-005 | Mon 19 Oct, before submission | Review every claim against its cited source; flag unsupported claims, missing comparisons, and unclear transitions | Amin | Zhanbolot | Not started |
+| T-006 | Mon 19 Oct, before submission | Revise Related Work from review comments and confirm both authors accept the final text | Zhanbolot | Amin | Not started |
+| T-007 | Mon 19 Oct | Confirm affiliation wording, build/download and inspect the PDF, then send the agreed GitHub link/PDF for the course submission | Amin | Zhanbolot | Not started |
+| T-008 | Tue 20 Oct | Prepare a short explanation of how the sources lead to the research gap; record questions for the lesson | Zhanbolot | Amin | Not started |
+| T-009 | Wed 21 Oct, before class | Open the submitted PDF together and confirm the section is ready to discuss | Amin | Zhanbolot | Not started |
 
-**Owner** is accountable for completing the row; **reviewer** checks it. Both researchers should read and discuss the complete section. If real names differ from `Researcher 1` and `Researcher 2`, replace these labels in this file and the project home.
+**Owner** is accountable for completing the row; **reviewer** checks it. Both researchers should read and discuss the complete section.
 
 ## Related Work: definition of done
 

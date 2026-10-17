@@ -1,7 +1,7 @@
 # Neural Upscaling Research Workspace
 
 **Working title:** An Ablation Study of Auxiliary Inputs for Lightweight Neural Upscaling in Real-Time Rendering  
-**Team:** two co-authors (names to be added)  
+**Team:** Zhanbolot Kydyraliev and Amin Soltobekov  
 **Current phase:** scope, literature, and manuscript setup
 
 This repository is the shared working space for the paper. There is **one manuscript source** in `04_Drafts/paper/main.tex`; its PDF is a generated preview, not a separate draft to edit. The title and study design are provisional until the team agrees on the experimental scope and a target venue.

@@ -2,7 +2,7 @@
 
 `main.tex` is the only editable manuscript. The PDF is a generated preview. Keep bibliography records in `references.bib` and cite them using `\cite{CitationKey}`. The visible “References” page is intentionally empty until real, verified sources are added and cited; reading-list items stay in the literature tracker.
 
-Replace `Author One`, `Author Two`, and the affiliation placeholders before sharing a formal draft. Keep the title page until a target conference or journal supplies its required template; then adapt the formatting without duplicating the manuscript content.
+Confirm the author order and replace the affiliation placeholder before sharing a formal draft. Keep the title page until a target conference or journal supplies its required template; then adapt the formatting without duplicating the manuscript content.
 
 ## Local build
 

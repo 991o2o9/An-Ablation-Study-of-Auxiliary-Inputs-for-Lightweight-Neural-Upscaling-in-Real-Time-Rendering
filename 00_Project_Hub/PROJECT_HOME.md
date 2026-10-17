@@ -17,8 +17,8 @@ By Monday, 2026-10-19: finish and cross-review the source-backed Related Work se
 ## Team
 | Name | Main responsibility this week | Contact / preferred working hours |
 |---|---|---|
-| Researcher 1 | Neural upscaling sources; integrate and revise Related Work | |
-| Researcher 2 | Auxiliary-input/evaluation sources; review text and prepare PDF handoff | |
+| Zhanbolot Kydyraliev | Neural upscaling sources; integrate and revise Related Work | |
+| Amin Soltobekov | Auxiliary-input/evaluation sources; review text and prepare PDF handoff | |
 
 ## Quick links
 - Project roadmap: `00_Project_Hub/ROADMAP.md`
