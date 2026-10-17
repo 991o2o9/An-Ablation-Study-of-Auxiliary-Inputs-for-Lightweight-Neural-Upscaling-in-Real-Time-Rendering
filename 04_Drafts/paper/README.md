@@ -16,7 +16,7 @@ Open `main.pdf`. If a new bibliography entry does not appear, cite its key in `m
 
 ## GitHub build
 
-The workflow in `.github/workflows/build-paper.yml` builds the PDF on pushes and pull requests. Open the successful **Build paper PDF** run under GitHub **Actions**, then download the `paper-pdf` artifact. The generated PDF is not committed, so authors cannot accidentally edit an outdated copy. Action artifacts expire according to repository settings; keep the LaTeX source in Git and export the final submission PDF separately when needed.
+The workflow in `.github/workflows/build-paper.yml` builds the PDF on pushes and pull requests. After a successful build on `main`, it also updates `paper.pdf` on the private `paper-preview` branch. Use the **Open the latest paper PDF** link in the repository README for a stable preview. Each run also keeps a downloadable `paper-pdf` artifact under GitHub **Actions**. Edit `main.tex`, not the generated PDF. Action artifacts expire according to repository settings; keep the LaTeX source in Git and export the final submission PDF separately when needed.
 
 ## Writing rules
 
