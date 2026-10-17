@@ -28,6 +28,7 @@ By Monday, 2026-10-19: finish and cross-review the source-backed Related Work se
 - Meeting log:
 - Decision log:
 - Current manuscript: `04_Drafts/paper/main.tex`
+- Current PDF preview: [Open the latest paper PDF](https://github.com/991o2o9/An-Ablation-Study-of-Auxiliary-Inputs-for-Lightweight-Neural-Upscaling-in-Real-Time-Rendering/blob/paper-preview/paper.pdf)
 - Experiment design: `05_Experiments/EXPERIMENT_PLAN.md`
 
 ## Current priorities
