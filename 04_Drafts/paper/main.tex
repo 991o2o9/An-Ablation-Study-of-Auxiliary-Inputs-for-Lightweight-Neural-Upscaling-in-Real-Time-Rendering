@@ -38,6 +38,35 @@ Neural upscaling reconstructs a higher-resolution image from lower-resolution re
 % Cite a verified entry from references.bib with \cite{CitationKey}.
 This section will compare relevant upscaling methods, rendering buffers, and evaluation practices.
 
+\subsection{Neural Supersampling for Real-Time Rendering}
+Xiao et al.~\cite{xiao2020neural} proposed a neural supersampling method for
+real-time rendering that reconstructs a high-resolution frame from a
+low-resolution, aliased one. Beyond the color image, their network takes
+auxiliary data that a rendering engine already produces, namely depth and
+motion vectors, and uses information from previous frames. The motion
+vectors are used to align (reproject) earlier frames with the current one,
+and a learned component decides how much to trust the aligned history,
+since it is unreliable where objects become newly visible or move quickly.
+The result is a high upsampling factor while keeping fine detail and
+temporal stability, with a design aimed at interactive applications such as
+games and virtual reality. This work is the closest to ours. It shows that
+engine-provided inputs matter in practice, but it focuses on presenting a
+full system rather than isolating how much each individual input
+contributes, which is the question our ablation study addresses.
+
+\subsection{Pixels as Samples}
+Smith~\cite{smith1995pixel} argues that a pixel should be understood as a
+point sample of an underlying continuous image, not as a small square of
+uniform color. Under this view, a low-resolution image is a set of samples
+taken from the scene, and producing a higher-resolution image is a
+reconstruction problem governed by sampling theory. This motivates two
+choices in our study. First, we render our low-resolution inputs natively
+instead of downsampling the high-resolution frames, because native rendering
+reproduces the aliasing that real real-time renderers produce, while
+filtered downsampling hides it. Second, classical interpolation such as
+bicubic is best viewed as a fixed reconstruction filter, which makes it a
+meaningful baseline for learned upscalers.
+
 \section{Method}
 \subsection{Research Questions and Study Design}
 The primary planned comparison is between an RGB-only baseline and variants with selected auxiliary inputs under a common model and evaluation setup. The final ablation matrix and its rationale are maintained in the experiment plan until the protocol is fixed.
