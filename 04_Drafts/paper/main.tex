@@ -30,33 +30,209 @@ This manuscript is in preparation. The abstract will be written after the resear
 \section{Introduction}
 Neural upscaling reconstructs a higher-resolution image from lower-resolution rendering data. A real-time renderer can also provide auxiliary signals, such as depth and motion vectors, that may help reconstruction. Each additional input has a potential quality benefit and a cost in data preparation, memory, and runtime. This study is planned as a controlled ablation of selected auxiliary inputs for a lightweight upscaler. The exact model, inputs, hardware, and evaluation conditions will be fixed in the experiment protocol before results are collected.
 
+We address five research questions about the individual and combined
+contributions of depth and surface normals, the effect of motion-aligned
+history, the measured costs of these variants, their performance on unseen
+scenes, and where in an image the inputs help or hurt. The questions and
+study design are given in Section~\ref{sec:rq}.
+
 % TODO: Add a source-backed motivation and define lightweight/real-time.
 % TODO: State the final research question and contributions after scope agreement.
 
 \section{Background and Related Work}
 % TODO: Synthesize verified sources by method, auxiliary input, and evaluation setting.
 % Cite a verified entry from references.bib with \cite{CitationKey}.
-This section will compare relevant upscaling methods, rendering buffers, and evaluation practices.
+The following work motivates the use of temporal history, rendering buffers,
+and sample reconstruction in the proposed study.
+
+\subsection{Temporal Anti-Aliasing and Supersampling}
+Low-resolution rendering can produce visible aliasing because rendered pixels
+sample the scene at discrete positions~\cite{xiao2020neural}. Karis's
+temporal anti-aliasing method for Unreal Engine 4 combines samples from
+successive frames after shifting the sampling positions between frames
+\cite{karis2014high}. Motion vectors reproject the previous result into the
+current frame. Inaccurate motion vectors can smear the result, while stale
+history can cause ghosting; Karis uses neighborhood clipping to limit the
+influence of incompatible history. These observations motivate our comparison
+between unaligned and motion-aligned history. That comparison tests the
+effect of alignment within our proposed upscaler, not the full temporal
+anti-aliasing method.
+
+\subsection{Neural Supersampling for Real-Time Rendering}
+Xiao et al.~\cite{xiao2020neural} present neural supersampling for real-time
+rendering. Their method reconstructs a high-resolution frame from
+low-resolution rendered color and uses depth, motion vectors, and information
+from previous frames. Motion vectors align earlier frames with the current
+frame, and the method learns to use the aligned history where it is useful.
+Their work demonstrates a system that combines current-frame rendering buffers
+with temporal information. Our proposed study asks a narrower question: how
+quality and measured cost change across selected input variants under a
+shared experimental protocol. In particular, V4 and V5 compare history
+without and with motion alignment; they do not measure the effect of motion
+vectors independently of temporal history.
+
+\subsection{Pixels as Samples}
+Smith~\cite{smith1995pixel} explains that a pixel represents a sample of an
+underlying image rather than a small square of uniform color. Upscaling can
+therefore be viewed as reconstruction from samples. This perspective makes
+classical interpolation, such as bicubic interpolation, a useful candidate
+baseline for a learned method. Separately, the proposed study will render
+low-resolution inputs natively at their intended input resolution, rather
+than create them by
+filtered downsampling of high-resolution frames. This choice is intended to
+retain the aliasing produced by the selected rendering process; it is a
+decision about our experimental data, not a claim made by Smith.
 
 \section{Method}
 \subsection{Research Questions and Study Design}
-The primary planned comparison is between an RGB-only baseline and variants with selected auxiliary inputs under a common model and evaluation setup. The final ablation matrix and its rationale are maintained in the experiment plan until the protocol is fixed.
+\label{sec:rq}
+We study how auxiliary rendering inputs affect a lightweight neural
+upscaler. We ask five research questions.
+\begin{description}
+\item[RQ1 (individual contribution)] Relative to color-only input, how do
+depth and surface normals each affect reconstruction quality, and how does
+motion-aligned history compare with unaligned history?
+\item[RQ2 (combination)] Do the quality gains from depth and normals overlap
+in the single-frame setting, and what is the incremental effect of adding
+them together to motion-aligned history?
+\item[RQ3 (cost)] How do the selected runtime and memory measurements vary
+across the variants on the provisional target GPU,
+relative to their reconstruction quality?
+\item[RQ4 (generalization)] Do quality differences between variants persist
+on held-out scenes, and how do they vary between those scenes?
+\item[RQ5 (where the inputs help)] Where in the image do auxiliary inputs
+help or hurt, for example at geometric edges, on thin structures, and in
+regions newly revealed by motion?
+\end{description}
+
+\paragraph{Hypotheses.}
+Before running experiments, we state expectations that the study can confirm
+or refute.
+\begin{description}
+\item[H1] Adding depth improves quality over color-only input.
+\item[H2] Adding surface normals improves quality over color-only input.
+\item[H3] Depth and normals are partly redundant, so using both improves
+quality by less than the sum of their individual gains.
+\item[H4] History warped with motion vectors improves quality over history
+used without alignment. Incorrect motion can smear temporal results
+\cite{karis2014high}, while motion-based alignment is used in neural
+supersampling~\cite{xiao2020neural}.
+\item[H5] Improvements of selected auxiliary-input variants over their
+matched baselines persist on scene-disjoint test scenes.
+\end{description}
+
+\paragraph{Study design.}
+We plan to use a shared base architecture while varying the inputs. A shared
+design does not imply identical parameter counts: changing the number of
+input channels changes the first layer, and temporal variants may require
+additional processing. The final architecture and treatment of temporal
+history will be fixed before experimentation. Training data, loss,
+optimizer, and schedule should be held constant across variants where
+applicable. We plan to use multiple random seeds; their number remains to be
+set. Parameter counts and computational complexity will be reported so that
+quality differences are not attributed solely to the inputs if model
+capacity also differs. Possible controls include matching parameter budgets
+or adding a capacity-matched comparison, subject to protocol finalization.
+
+Table~\ref{tab:variants} lists the core variants. V1 versus V0 isolates
+depth, and V2 versus V0 isolates normals. V3 versus V1 estimates the
+incremental effect of normals with depth, while V3 versus V2 estimates the
+incremental effect of depth with normals; together with V0, these
+comparisons test overlap in the single-frame setting. V4 versus V0
+estimates the effect of adding unaligned history, while V5 versus V4 tests
+motion alignment of that history, provided the temporal model and history
+inputs are otherwise held constant. V6 versus V5 estimates the combined
+addition of depth and normals
+to aligned history; V6 versus V3 compares the combined temporal variant with
+its single-frame counterpart. These comparisons do not independently
+identify every depth, normal, and temporal interaction. In particular,
+the matrix does not isolate motion vectors without history or the individual
+effects of depth and normals when aligned history is present. Variants that
+add only depth or only normals to aligned history could be considered as
+optional extensions if the study scope permits.
+
+Training, validation, and test scenes will be disjoint at the scene level;
+frames from a test scene will not be used for model fitting or protocol
+selection. Validation scenes will support model and protocol choices, while
+held-out test scenes will support the reported comparisons. Scenes with a
+defined distribution shift would require a separate out-of-distribution
+test; being unseen during training alone does not establish such a shift.
+RQ1 and RQ2 use the variant comparisons above; RQ3 compares quality with
+the selected cost measurements; RQ4 compares variants across held-out
+scenes; and RQ5 examines spatial error patterns, including error maps.
+Candidate metrics and cost dimensions are discussed in
+Section~\ref{sec:metrics}. The temporal variants are a planned extension,
+and their implementation and the final protocol remain to be fixed.
+
+\begin{table}[h]
+\centering
+\caption{Planned core input variants (V0 is the color-only baseline).}
+\label{tab:variants}
+\begin{tabular}{llcccc}
+\hline
+ID & Group & Color & Depth & Normals & History \\
+\hline
+V0 & Single frame & yes & -- & -- & -- \\
+V1 & Single frame & yes & yes & -- & -- \\
+V2 & Single frame & yes & -- & yes & -- \\
+V3 & Single frame & yes & yes & yes & -- \\
+V4 & Temporal & yes & -- & -- & unaligned \\
+V5 & Temporal & yes & -- & -- & motion aligned \\
+V6 & Temporal & yes & yes & yes & motion aligned \\
+\hline
+\end{tabular}
+\end{table}
+% TODO: fix the number of seeds, the scenes, and the train/test split in
+% Section 3.2 and 3.3 before collecting results.
 
 \subsection{Model, Inputs, and Data}
 % TODO: Specify architecture, input preprocessing, scenes, splits, resolution, and scale.
-The architecture, rendering inputs, and train/test scenes are to be selected.
+The architecture, input preprocessing, scenes, resolution, and upscaling
+factor are to be selected. The training, validation, and test scene lists
+and the method for producing aligned or unaligned history will be fixed
+before any experiments are run.
 
 \subsection{Evaluation Protocol}
+\label{sec:metrics}
 % TODO: Specify baselines, quality metrics, latency/memory measurement, and hardware.
-The measurement protocol will be fixed before final experiments.
+Candidate image-quality measures include PSNR and SSIM; a perceptual metric
+may be added if it suits the final reference images. These measures would
+support RQ1, RQ2, and RQ4. A temporal consistency measure may be useful for
+RQ5 and the temporal comparisons, provided it can distinguish instability
+from genuine scene motion. Error maps and selected image regions can also
+support RQ5. The final measures, aggregation across frames and scenes, and
+statistical treatment across seeds will be specified before testing.
+
+For RQ3, possible cost measures include neural inference latency and GPU
+memory consumption. Auxiliary-buffer preparation, history warping and
+storage, data transfers, and total upscaling-pipeline time may also matter
+for deployment. The protocol must specify which of these are measured, how
+their boundaries are defined, and the target hardware and timing procedure.
+Any costs outside those boundaries will be identified as unmeasured, so a
+quality--cost comparison is not mistaken for a complete pipeline benchmark.
+The measurement protocol and any interpolation baseline remain to be fixed
+before the experiments.
 
 \section{Results}
 % TODO: Add tables, figures, run IDs, and uncertainty only after experiments.
 Results have not yet been collected.
 
+\subsection{Contribution of Individual and Combined Inputs (RQ1, RQ2)}
+% TODO: results not yet collected.
+
+\subsection{Runtime and Memory Cost (RQ3)}
+% TODO: results not yet collected.
+
+\subsection{Generalization to Unseen Scenes (RQ4)}
+% TODO: results not yet collected.
+
+\subsection{Where the Inputs Help or Hurt (RQ5)}
+% TODO: results not yet collected.
+
 \section{Discussion}
 % TODO: Interpret effects and interactions, compare with cited work, and discuss limits.
-This section will interpret quality and runtime tradeoffs after results are available.
+This section will answer RQ1 to RQ5 in turn, state whether hypotheses H1 to
+H5 were supported by the results, and discuss the limitations of the study.
 
 \section{Conclusion}
 % TODO: Answer the final research question using measured evidence.
