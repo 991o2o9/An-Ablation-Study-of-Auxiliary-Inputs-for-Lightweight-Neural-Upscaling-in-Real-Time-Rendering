@@ -1,32 +1,27 @@
 # Literature Synthesis
 
-Organize this page by themes and comparisons, not as a sequence of unrelated paper summaries. Cite sources using the shared citation keys from `04_Drafts/paper/references.bib` or DOI links.
+Working screening, 2026-11-05. The manuscript describes a planned study, not results. Links below are primary publications or vendor documentation. Decisions and unresolved extraction are in the [tracker](../01_Literature/LITERATURE_TRACKER.csv); the four priority papers have notes. Tracker keys identify screened sources; only cited sources are added to the manuscript bibliography. The search was targeted and is not a systematic review.
 
-## Theme 1: Upscaling and reconstruction methods
-- What methods are compared?
-- Which assumptions recur?
-- Sources:
+## Reconstruction and existing ablations
 
-## Theme 2: Auxiliary inputs
-| Input | Papers testing it | Reported benefit | Cost / failure cases | Evidence strength |
-|---|---|---|---|---|
-| Depth | | | | |
-| Motion vectors | | | | |
-| Normals / G-buffer channels | | | | |
-| History / temporal signals | | | | |
+[Xiao et al.](https://www.cs.jhu.edu/~misha/ReadingSeminar/Papers/Xiao20.pdf), §3.2, §4.3.5–4.3.7 and Tables 8–10, use low-resolution color and depth, motion-aligned temporal features, and a U-Net. Table 8 compares VESPCN with a modified model adding depth and substituting renderer motion for optical flow: it changes two things at once. Figure 9 compares single-frame and temporal versions. These are direct prior ablations, but neither is the proposed depth-versus-normal factorial contrast.
 
-## Theme 3: Lightweight and real-time constraints
-Compare latency, model size, memory, hardware, resolution, and quality trade-offs. Avoid comparing runtime numbers without their hardware and test conditions.
+[Wen et al.](https://ojs.aaai.org/index.php/AAAI/article/download/32897/35052), pp. 8315–8319 and Fig. 6(a), sequentially add depth, normal direction and derived edges to CGSR-P and examine accuracy and parameter size. Their architecture search and pruning couple inputs to capacity. This substantially overlaps V0–V3 and spatial-error motivation; it is not evidence that a depth/normal factorial analysis has never been done. Verify figure order and all controls before making a stronger comparison.
 
-## Theme 4: Evaluation practice
-Which datasets/scenes, baselines, image-quality metrics, and runtime measurement procedures are used?
+[Mercier et al.](https://openaccess.thecvf.com/content/ICCV2023/papers/Mercier_Efficient_Neural_Supersampling_on_a_Novel_Gaming_Dataset_ICCV_2023_paper.pdf), §6.2, Table 3 and Fig. 9, explicitly compare no warp, motion vectors versus optical flow, and a single-frame variant. Thus V4–V5 cannot be described as the first test of alignment. Depth-informed motion dilation also has an ablation; the authors report improved thin-object reconstruction even though aggregate PSNR and LPIPS favor removing dilation. It changes a motion-processing component rather than independently adding depth to a color-only model.
 
-## Agreements, disagreements, and gaps
-- Consistent findings:
-- Conflicting findings:
-- Under-tested settings or inputs:
-- What our study could clarify:
+[Zheng et al.](https://openaccess.thecvf.com/content/CVPR2025/papers/Zheng_Efficient_Video_Super-Resolution_for_Real-time_Rendering_with_Decoupled_G-buffer_Guidance_CVPR_2025_paper.pdf), §§3–5 and Table 4, use normal and BRDF for detail guidance and depth and motion for temporal refinement, and compare guidance/fusion designs. These are architectural comparisons with coupled inputs, not independent depth and normal effects. Their low-resolution guidance and recurrent feature history differ from high-resolution material inputs in [Li et al.](https://openaccess.thecvf.com/content/CVPR2024/html/Li_Neural_Super-Resolution_for_Real-time_Rendering_with_Radiance_Demodulation_CVPR_2024_paper.html) and high-resolution buffers in [FuseSR](https://arxiv.org/abs/2310.09726). Input resolution and encoding must be reported before comparison.
 
-## Candidate research questions / hypotheses
-1. 
-2. 
+[Karis](https://de45xmedrsdbp.cloudfront.net/Resources/files/TemporalAA_small-59732822.pdf) remains useful temporal-reconstruction background on reprojection and history rejection. It does not provide a controlled neural history comparison. [Thomas et al.](https://doi.org/10.1145/3543870) address joint denoising and supersampling, a distinct noisy-input task. [Shi et al.](https://openaccess.thecvf.com/content_cvpr_2016/html/Shi_Real-Time_Single_Image_CVPR_2016_paper.html) support consideration of low-resolution computation and sub-pixel reconstruction; [Dong et al.](https://people.csail.mit.edu/kaiming/publications/eccv14srcnn.pdf) are excluded from this focused set as less directly useful historical background, not because their work lacks merit.
+
+## Cost and evaluation
+
+Do not compare latency across papers without matching output resolution, hardware, precision, warm-up and whether buffer production, warping and transfers are included. Mercier Fig. 1 reports 2× 1080p timings on RTX 3090; Zheng Table 1 reports latency and memory at 270×480 input on RTX 3090. Those measurements do not establish end-to-end cost in the planned pipeline. Wen's architecture changes make quality, input and capacity intertwined. Report per-variant parameter counts and measurement boundaries.
+
+Zheng §4.1 describes 20 training scenes and eight named test scenes; confirm scene identities and split before claiming scene-disjoint testing. Scene-level variation is preferable to an overall frame average alone. Xiao Fig. 10 highlights disocclusion and Mercier Fig. 10 thin objects; inspect those regions alongside geometric boundaries and temporal stability. Candidate perceptual measures are [LPIPS](https://openaccess.thecvf.com/content_cvpr_2018/papers/Zhang_The_Unreasonable_Effectiveness_CVPR_2018_paper.pdf) and [FLIP](https://research.nvidia.com/sites/default/files/node/3260/FLIP_Paper.pdf); the latter offers spatial maps. Neither replaces metric-specific validation, stated color processing or temporal assessment. [Wang et al.](https://ece.uwaterloo.ca/~z70wang/publications/ssim.pdf) define SSIM and discuss PSNR; the original [LDR-FLIP](https://doi.org/10.1145/3406183) and distinct [HDR-FLIP](https://doi.org/10.2312/egs.20211015) support the provisional display-image and HDR alternatives, respectively.
+
+AMD's [FSR 1.2](https://gpuopen.com/manuals/fidelityfx_sdk/techniques/super-resolution-spatial/) is a spatial upscaler with normalized perceptual-color input; [FSR 2.3.3](https://gpuopen.com/manuals/fidelityfx_sdk/techniques/super-resolution-temporal/) is temporal and specifies motion-vector resolution and depth conventions. These version-specific integration documents are not input ablations. [Liu's DLSS 2.0 presentation](https://developer.nvidia.com/gtc/2020/video/s22698-vid) is vendor context; detailed architecture and experimental controls are unverified from the accessible landing page.
+
+## Cautious scope for the planned study
+
+The potentially useful contribution is a *specified, controlled comparison in the eventual chosen setting*, connecting V0–V3 depth/normal combinations, V4–V5 alignment, and V6's joint addition to aligned history with scene-level quality, spatial failures and measured costs. This is a candidate scope, not a demonstrated literature gap or novelty claim. Existing work already tests combinations and alignment; further full-text and supplement review is needed to determine whether the exact controlled matrix and conditions are distinct. V6 versus V5 measures the two inputs jointly, not their individual temporal effects; V5 versus V4 measures alignment of history, not motion alone. The experiment plan now uses the same provisional V0–V6 matrix as the manuscript; its implementation and comparison controls remain to be finalized.
