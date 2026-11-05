@@ -16,28 +16,29 @@ An Ablation Study of Auxiliary Inputs for Lightweight Neural Upscaling in Real-T
 - Real-time rendering and upscaling context
 - Why auxiliary inputs may help
 - Lightweight deployment constraints
-- Specific gap and research question
+- Provisional study objective and relationship to existing ablations
 - Contributions
 
 ## 2. Background and Related Work
-- Neural upscaling / super-resolution
-- Temporal reconstruction and rendering buffers
-- Auxiliary-input ablations
-- Lightweight inference and real-time evaluation
+- Efficient neural reconstruction and quality–cost trade-offs
+- Geometric guidance from depth and normals
+- Temporal history, alignment, and spatial failure cases
 
 ## 3. Method
-- Research questions and hypotheses
-- Model and training setup
-- Inputs and ablation variants
+- Study design and analysis topics; hypotheses as testable expectations
+- Color-only baseline and V1–V3 spatial variants
+- V4–V6 temporal extension and limits of comparisons
+- Model, capacity controls, and training setup
 - Data/scenes and preprocessing
 - Baselines
 - Metrics and runtime protocol
 
 ## 4. Results
-- Image-quality results
-- Runtime and memory results
-- Per-input ablations and interactions
-- Visual examples and failure cases
+- Individual and combined geometric inputs
+- Temporal history and alignment
+- Quality, runtime, and memory trade-offs
+- Variation across held-out scenes
+- Spatial benefits and failure cases
 
 ## 5. Discussion
 - Interpretation and trade-offs
@@ -46,7 +47,7 @@ An Ablation Study of Auxiliary Inputs for Lightweight Neural Upscaling in Real-T
 - Practical implications
 
 ## 6. Conclusion
-- Answer to research question
+- Address the study objective using measured evidence
 - Main findings
 - Next steps
 

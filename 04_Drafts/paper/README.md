@@ -4,6 +4,10 @@
 
 Confirm the author order and replace the affiliation placeholder before sharing a formal draft. Keep the title page until a target conference or journal supplies its required template; then adapt the formatting without duplicating the manuscript content.
 
+## Provisional layout
+
+The existing title page remains single-column; the manuscript body and references use standard two-column reading order. Wide tables may span both columns. This is a working layout, not a claim of compliance with any venue template.
+
 ## Local build
 
 Install a TeX distribution with `latexmk` and `biber`. From this directory run:
