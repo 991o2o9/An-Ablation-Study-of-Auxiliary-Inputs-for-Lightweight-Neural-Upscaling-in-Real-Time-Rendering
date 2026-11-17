@@ -20,6 +20,7 @@
 \setcounter{biburlnumpenalty}{9000}
 \setcounter{biburlucpenalty}{9000}
 \setcounter{biburllcpenalty}{9000}
+\renewcommand*{\bibfont}{\small}
 
 \begin{document}
 
@@ -58,16 +59,14 @@ features with information supplied by the renderer. Both approaches must
 handle motion and avoid introducing visible artifacts.
 
 Rendering buffers offer geometric and temporal cues beyond color. Prior
-work has examined their use and ablated components: Wen et al.\ investigate
-rendering properties including depth and normals in a framework that also
-optimizes network size, and Mercier et al.\ compare temporal reconstruction
-with and without warping \cite{wen2025cgsr,mercier2023efficient}. These
-studies motivate, but do not determine, the effects of selected inputs in a
-different model and rendering setup. The quality of a reconstruction also
-cannot be assessed solely from an aggregate score: for example, Mercier
-et al.\ report a benefit of depth-informed motion processing on thin objects
-even when removing that processing improves aggregate scores in their test
-\cite{mercier2023efficient}.
+work shows how these cues can assist reconstruction: Xiao et al.\ combine
+depth and motion-aligned history in a neural system, while Wen et al.\ study
+rendering inputs as part of an architecture-optimization framework
+\cite{xiao2020neural,wen2025cgsr}. Mercier et al.\ compare temporal
+reconstruction with and without warping and show why image-wide scores can
+miss thin-object artifacts \cite{mercier2023efficient}. These findings
+identify useful inputs and evaluation concerns, but their effects depend on
+the model, rendering setup, and processing used for each comparison.
 
 We plan a controlled study of auxiliary inputs for a lightweight neural
 upscaler. Under a shared experimental protocol, we intend to compare depth
@@ -81,65 +80,96 @@ measurement boundaries remain to be fixed before experiments.
 
 \section{Background and Related Work}
 \subsection{Efficient Neural Reconstruction}
-Neural reconstruction can exploit rendering information as well as color, but
-a more capable model must fit within the rendering time budget. Xiao et al.\
-combine low-resolution color and depth with motion-aligned features from
-previous frames in a temporal neural supersampling system
-\cite{xiao2020neural}. Mercier et al.\ develop an efficient temporal
-architecture and a gaming dataset with rendered depth and motion; their
-model-size comparisons illustrate that quality and inference time depend on
-the selected network and workload \cite{mercier2023efficient}. Wen et al.\
-take a different approach, using rendering information to guide network
-construction, architecture search, and pruning across super-resolution
-backbones \cite{wen2025cgsr}. Thus, comparing their results requires
-considering both the supplied information and changes in computation. A
-latency reported for one method does not by itself establish the total cost
-of another pipeline, including buffer preparation and temporal processing.
+Real-time reconstruction must recover detail within a frame-time budget.
+Xiao et al.\ show that a neural supersampler can use renderer-provided depth
+and motion vectors to combine current color with reprojected features from
+previous frames \cite{xiao2020neural}. Their system motivates our choice of
+geometric inputs and history, but its architecture and combined input changes
+do not give the individual depth or normal effects sought here. Mercier et
+al.\ develop a more efficient temporal network and a rendered gaming dataset;
+their model-size and component studies connect reconstruction quality to
+inference cost and the workload being measured \cite{mercier2023efficient}.
+Wen et al.\ instead integrate rendering properties into network construction,
+architecture search, and pruning across super-resolution backbones
+\cite{wen2025cgsr}. Their optimization demonstrates that input choice and
+model computation can change together. Accordingly, our proposed variants
+will use a shared base design where feasible and report parameter counts,
+computational complexity, neural inference time, and separately defined
+pipeline costs. None of these works is an implemented baseline for this
+study; any comparator beyond V0 remains undecided.
 
 \subsection{Geometric Guidance}
-Depth and normals describe different aspects of scene geometry and can be
-used to guide reconstruction. Wen et al.\ investigate the sequential
-addition of rendering properties, including depth, normal direction, and
-object edges derived from depth, in their CGSR framework
-\cite{wen2025cgsr}. Their analysis relates reconstruction errors to geometric
-regions and examines accuracy and model size; it also changes the network
-through its optimization framework. This informs our planned single-frame comparisons of color alone, depth,
-normals, and their combination, but does not by itself establish their
-effects in our proposed shared architecture.
+Depth indicates scene distance, while surface normals indicate orientation;
+they may therefore supply different cues at edges and on changing surfaces.
+Wen et al.\ sequentially add depth, normal direction, and derived edge
+information in CGSR, relating those properties to reconstruction errors and
+model size \cite{wen2025cgsr}. This is an existing rendering-input ablation,
+but its sequential design and network optimization do not answer how depth
+and normals behave individually and together in our eventual shared model.
+Our planned V1--V0 and V2--V0 comparisons examine each addition to color;
+V3--V1 and V3--V2 examine their incremental effects in the single-frame
+setting, subject to capacity and processing controls.
 
-Geometric signals can also enter different parts of a temporal model. Zheng
-et al.\ use normals together with material information to guide detail
-reconstruction, while depth and motion guide temporal feature refinement
-\cite{zheng2025rdg}. Their comparison of decoupled guidance with other fusion
-designs tests how information is incorporated rather than isolating the
-effect of each buffer. These approaches motivate comparing individual and
-combined geometric inputs, while reporting changes in model capacity and
-cost alongside quality. In particular, adding depth and normals together to aligned history cannot
-identify their separate effects in the temporal setting.
+Zheng et al.\ place normals and material information in a detail-reconstruction
+module, while depth and motion constrain temporal feature refinement
+\cite{zheng2025rdg}. Their ablations compare decoupled guidance against
+concatenation and alternative fusion modules. They show that the way signals
+are combined matters, but do not isolate each buffer's contribution within
+our planned input matrix. Fusion design is therefore methodological context,
+not an additional variant or adopted module here. V6--V5 will examine the
+joint addition of depth and normals to aligned history; it cannot separate
+their temporal effects.
 
 \subsection{Temporal History, Alignment, and Failure Cases}
-Temporal reconstruction uses motion to relate samples across frames. In
-Karis's temporal antialiasing method, motion vectors reproject history and
-neighborhood clipping limits incompatible history
-\cite{karis2014high}. Neural supersampling likewise uses motion-based
-alignment, but must handle disocclusions and changes that surface motion
-does not capture, such as changes in lighting \cite{xiao2020neural}.
-Xiao et al.\ compare a single-frame model with their temporal model; in a
-separate comparison they add depth while replacing estimated optical flow
-with renderer motion vectors. The latter changes both inputs and alignment
-mechanism, so it does not isolate either effect.
+Temporal history can supply samples missing from the current frame, provided
+they correspond to the current view. Karis's temporal antialiasing method
+uses motion vectors to reproject history and constrains incompatible history
+with a current-frame neighborhood \cite{karis2014high}. It also describes
+failure at silhouettes and where motion is inaccurate. These are principles
+for our aligned-history comparison and failure inspection; the complete
+antialiasing method is not part of our proposed implementation.
 
-Mercier et al.\ also compare their temporal method with a no-warp variant,
-and test depth-informed motion-vector dilation \cite{mercier2023efficient}.
-In their 2$\times$ medium-model ablation, removing dilation improves
-aggregate PSNR and LPIPS, whereas their visual comparison shows reduced
-artifacts on thin objects with dilation. Xiao et al.\ illustrate ghosting
-at disocclusions when their feature-reweighting module is removed
-\cite{xiao2020neural}. These observations motivate examining localized
-failures as well as aggregate quality; they do not establish that any
-planned variant will improve those regions. Our proposed comparison of unaligned and motion-aligned history will test
-alignment within the selected model, rather than the independent effect of
-motion vectors or the complete temporal methods above.
+Xiao et al.\ compare single-frame and temporal reconstruction, and study
+alternative reprojection settings \cite{xiao2020neural}. Their separate
+depth-and-motion-input comparison also replaces estimated optical flow with
+renderer motion vectors, so it does not isolate either change. Mercier et
+al.\ explicitly compare their temporal model with no warping and with
+estimated flow \cite{mercier2023efficient}. Thus, alignment ablations already
+exist. Our V4--V0 comparison asks what adding unaligned history changes in
+our selected model, while acknowledging any extra temporal processing;
+V5--V4 tests alignment only if the history representation and all other
+temporal processing match. Neither comparison isolates motion vectors
+independently of history.
+
+Both works also caution against relying only on whole-image averages. Xiao
+et al.\ show disocclusion ghosting when feature reweighting is removed
+\cite{xiao2020neural}. In Mercier et al.'s 2$\times$ medium-model ablation,
+removing depth-informed motion-vector dilation improves aggregate PSNR and
+LPIPS, although their thin-object example favors dilation
+\cite{mercier2023efficient}. We therefore plan selected error maps, crops,
+and sequence inspection for localized failures, alongside aggregate measures;
+regional statistics will require independently defined masks.
+
+\subsection{Implications for This Study}
+The literature gives a practical reason to investigate both geometry and
+history: rendered depth and normals can describe structure that low-resolution
+color misses, while previous frames can supply additional samples when their
+contents remain relevant to the current view. Input effects also depend on
+fusion, network capacity, and temporal processing. Previous studies contain input and
+alignment ablations. Our planned comparisons therefore address a narrower
+question within a selected lightweight model and rendering setup. V0--V3
+will examine individual and incremental geometric additions in a single-frame
+setting; V4 and V5 will compare history without and with motion alignment
+under matched temporal processing; V6 will test depth and normals jointly
+with aligned history. These contrasts will be interpreted with reported
+parameter counts and computation, rather than assumed to isolate effects
+that the matrix cannot separate. Reconstruction quality also has to be read
+alongside neural inference time, other pipeline costs, memory use, and
+localized artifacts: a favorable image-wide score may hide thin-object or
+disocclusion failures, and a quality gain may carry a frame-time cost. With
+the protocol fixed before testing, this study aims to establish which input
+choices offer useful trade-offs across held-out scenes, without presuming
+their outcomes.
 
 \section{Method}
 \subsection{Study Design and Analysis Topics}
