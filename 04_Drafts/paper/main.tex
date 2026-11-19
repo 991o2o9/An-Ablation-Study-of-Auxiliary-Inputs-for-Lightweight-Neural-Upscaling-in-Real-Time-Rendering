@@ -200,7 +200,8 @@ The first two rows form the QRISP experiment. The last two are reserved
 for an extension with independently rendered normals.}
 \label{tab:variants}
 \small
-\begin{tabular}{lccc}
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lccc@{}}
 \hline
  & \multicolumn{3}{c}{Previous LR RGB} \\
 Geometry & Absent & Unaligned & Aligned \\
@@ -305,7 +306,7 @@ averaged over channels \cite{wang2004ssim}.
 To describe temporal behavior, we will also report the mean absolute
 difference between successive output changes and reference changes in
 screen coordinates, computed on evaluation RGB:
-$\lvert(\hat I_t-\hat I_{t-1})-(I_t-I_{t-1})\rvert$.
+$\left|(\hat I_t-\hat I_{t-1})-(I_t-I_{t-1})\right|$.
 This requires two consecutive scored frames in the same segment. We will
 use the same scene weighting and inspect synchronized reference and
 output clips for moving silhouettes, newly visible regions, and UI.
