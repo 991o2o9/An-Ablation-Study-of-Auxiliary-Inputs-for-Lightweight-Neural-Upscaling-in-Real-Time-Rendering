@@ -20,7 +20,62 @@ Compare selected auxiliary inputs for a lightweight neural upscaler under a comm
 | Hardware | Target GPU and software environment | Open |
 | Success criterion | How to interpret effects and uncertainty across the analysis topics | Open |
 
-## Proposed ablation matrix
+
+## Proposed QRISP methodology revision (November 2026; NOT FROZEN)
+
+This design is synchronized with the Method section of `04_Drafts/paper/main.tex` on the methodology draft branch. It is a proposal, not evidence of dataset access, training or completed experiments.
+
+### Dataset and setting
+
+- Primary: Qualcomm QRISP from Mercier et al. (ICCV 2023): https://www.qualcomm.com/developer/software/qualcomm-rasterized-images-dataset
+- Grounded published modalities: 540p color (non-jittered `MipBiasMinus1`), 540p packed depth (`DepthMipBiasMinus1`), 540p motion EXR (`MotionVectorsMipBiasMinus1`), 1080p `Enhanced` target, camera metadata. 2× output: 960×540 → 1920×1080.
+- Published dataset: 13 scenes, ten development scenes (7,260 frames) and three evaluation scenes (1,500 frames). Hold the latter untouched. Hold two development scenes for validation, chosen and documented before tuning. Inspect near-duplicate/asset-family overlap; do not overclaim independent content.
+- Non-jittered, fixed mipmap bias in primary study; jittered condition only as an explicit separate secondary experiment. Document licenses, acquisition, hashes, file identities, frame/segment boundaries, alignment, and validity before using QRISP.
+- Surface normals are **not documented** as part of QRISP. A depth-derived normal map cannot support an independent-normal hypothesis. Normal variants stay conditional until independently sourced normals are validated.
+
+### Matrix (current RGB present in every variant)
+
+| ID | Depth | Normals | Previous-frame RGB | Alignment | Scope |
+|---|---|---|---|---|---|
+| V0 | No | No | No | -- | Core |
+| V1 | Yes | No | No | -- | Core |
+| V2 | No | Yes | No | -- | Conditional |
+| V3 | Yes | Yes | No | -- | Conditional |
+| V4 | No | No | Yes | Unaligned | Core |
+| V5 | No | No | Yes | Motion aligned | Core |
+| V6 | Yes | No | Yes | Unaligned | Core |
+| V7 | Yes | No | Yes | Motion aligned | Core |
+| V8 | No | Yes | Yes | Unaligned | Conditional |
+| V9 | No | Yes | Yes | Motion aligned | Conditional |
+| V10 | Yes | Yes | Yes | Unaligned | Conditional |
+| V11 | Yes | Yes | Yes | Motion aligned | Conditional |
+
+Core QRISP comparisons: V1–V0 for depth, V5–V4 for alignment without depth, V7–V6 for alignment with depth, and (V7–V6)–(V5–V4) for alignment-by-depth interaction. The V6 identifier **does not** retain its meaning in the older matrix; revise any external notes before final runs. Geometry + history without motion alignment is necessary for isolating geometry-conditioned alignment.
+
+### Model and training proposal
+
+- Same nonrecurrent 32-feature residual CNN, four residual blocks, subpixel 2× head, bilinear RGB skip. All models have ten input slots (RGB 3 + depth 1 + normals 3 + history 3), with absent slots zeroed. Parameter count, active inputs, preprocessing time and actual runtime reported per variant.
+- A single previous *low-resolution rendered RGB frame* is used as history; motion alignment is deterministic bilinear warping, not a learned extra motion input. Establish EXR channel order, motion sign/scaling and warp validity empirically. Avoid leaking history across segments; evaluate all variants on same eligible non-first frames.
+- Pilot recommendation: 64×64 LR/128×128 HR crops, L1 loss, AdamW LR 1e-3, batch eight, 20k updates, validation every 1k updates, three full-run seeds. These values are provisional until a small speed/validity pilot establishes feasibility; freeze them before final test runs. No geometric flip/rotation augmentations without adjusting and testing motion vectors.
+- Record dataset hash, split manifest, scene-family overlap assessment, seed, Git revision, software versions, checkpoint, and all metric/timing settings. Retain raw downloaded dataset out of Git.
+
+### Evaluation and limitations
+
+- PSNR (per-frame before averaging, range [0,1]) primary; SSIM complementary; bicubic non-neural baseline. Optional perceptual/temporal assessments only when their precise input and calculation conventions are fixed.
+- Report per-scene and per-seed outcomes and paired differences, not naive frame-level confidence intervals. 3 held-out scenes limit statistical inference.
+- Bench network-only and GPU pipeline including history warping separately, full 1080p batch-one, warmed-up CUDA event timing. No claim of UE integration or true frame-budget feasibility from offline measurements alone.
+- Source: Mercier et al. supplement, https://openaccess.thecvf.com/content/ICCV2023/supplemental/Mercier_Efficient_Neural_Supersampling_ICCV_2023_supplemental.pdf (Annex A, Tables 4–5). Verify downloaded files before committing final details.
+
+### Pilot gates
+
+1. Access QRISP under applicable terms; inspect one segment with all core modalities and metadata.
+2. Confirm 540p↔1080p pairing, depth decode, EXR channel order, motion direction/jitter conventions and image pipeline.
+3. Measure V0 pilot throughput/memory; run a non-learning warp sanity check; decide feasibility of 20k updates × 3 seeds.
+4. Freeze dataset scene list, splits, model, loss, metric and timing protocols before final runs, after both authors review.
+
+---
+
+## Historical seven-variant matrix (superseded by QRISP draft above)
 
 V0 is the color-only single-frame baseline; V1–V3 add depth and normals individually and together. The temporal extension adds history to color, compares unaligned and motion-aligned history, then adds depth and normals together. All variants are proposed, subject to buffer availability and final protocol agreement.
 
