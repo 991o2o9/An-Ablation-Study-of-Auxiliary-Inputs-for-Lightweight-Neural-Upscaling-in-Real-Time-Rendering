@@ -1,136 +1,58 @@
-# Experiment Plan (Design Draft)
+# QRISP experiment plan
 
-This page describes how the future study should be designed. It is **not** a claim that experiments, datasets, code, or results already exist. Agree on the choices below with both authors before implementation.
+This is the proposed protocol for the [working manuscript](../04_Drafts/paper/main.tex). The counts below come from the published dataset inventory. Raw files, training throughput and reconstruction quality still need to be measured.
 
-## Study objective
+## Dataset and split
 
-Compare selected auxiliary inputs for a lightweight neural upscaler under a common real-time rendering protocol, examining reconstruction quality, runtime and memory, held-out scene variation, and spatial benefits and failures. The matrix below distinguishes individual and combined spatial inputs, history alignment, and the joint addition of geometric inputs to aligned history; it does not isolate every input or interaction.
+Use QRISP’s non-jittered 540p `MipBiasMinus1` RGB, `DepthMipBiasMinus1` depth and `MotionVectorsMipBiasMinus1` motion with the same frame’s 1080p `Enhanced` target. Build a manifest keyed by scene, segment, frame ID and capture condition. Preserve the documented ten-development/three-test partition.
 
-## Decisions to freeze before code
+| Proposed split | Scene names from the publication | Segments | Frames | Eligible consecutive pairs |
+|---|---|---:|---:|---:|
+| Train | FloodedGrounds, FloodedGroundsBridges, SciFiFacility, CB-Apocalypse, SunTemple, SunTempleBush, SunTempleLamps | 160 | 4,800 | 4,640 |
+| Validation | SciFiBase, ScifiBaseStartStop, ScifiBaseNightStartStop | 82 | 2,460 | 2,378 |
+| Published test | AbandonedSchool, SpaceShipDemo, Seaport | 5 | 1,500 | 1,495 |
 
-| Decision | What to specify | Status |
-|---|---|---|
-| Model and baseline | Architecture, parameter budget, RGB-only baseline, non-neural comparator if feasible | Open |
-| Input candidates | Depth, motion vectors, normals, history, and which are actually available in the renderer | Open |
-| Temporal setting | Temporal extension: history representation, alignment, motion handling, and frame resets | Open |
-| Data | Scenes, rendering pipeline, train/validation/test split, reference images | Open |
-| Image setup | Input/output resolution, scale factor, color space, exposure, antialiasing | Open |
-| Training | Losses, optimization, budget, seeds, stopping rule | Open |
-| Metrics | Main quality metric, perceptual/temporal measures, latency, memory, model size | Open |
-| Hardware | Target GPU and software environment | Open |
-| Success criterion | How to interpret effects and uncertainty across the analysis topics | Open |
+Holding the entire SciFiBase environment family for validation keeps the base, night and stop/start captures together. Individual assets recur across environments. Use the published names as labels and record the actual archive paths in the manifest. Fit weights on training scenes, select checkpoints on validation scenes, and score the held-out test set after fixing the protocol. Verify expected counts against intact adjacent frame IDs. Record every exclusion and apply it to all variants.
 
+Mercier et al. give the modality encodings, filenames by resolution, segment lengths and asset lists in [Annex A and Tables 4–6](https://openaccess.thecvf.com/content/ICCV2023/supplemental/Mercier_Efficient_Neural_Supersampling_ICCV_2023_supplemental.pdf). The distributor provides [the dataset and terms](https://www.qualcomm.com/developer/software/qualcomm-rasterized-images-dataset) and [per-scene archive instructions](https://www.qualcomm.com/content/dam/qcomm-martech/dm-assets/documents/qualcomm-rasterized-images-download-instructions_081624.pdf).
 
-## Proposed QRISP methodology revision (November 2026; NOT FROZEN)
+## Ablation matrix
 
-This design is synchronized with the Method section of `04_Drafts/paper/main.tex` on the methodology draft branch. It is a proposal, not evidence of dataset access, training or completed experiments.
+Current RGB is always present. The column describes only the immediately preceding LR RGB. Geometry is always from the current frame.
 
-### Dataset and setting
+| Current geometry | No history | Unaligned history | Motion-aligned history | Scope |
+|---|---|---|---|---|
+| None | V0 | V4 | V5 | QRISP |
+| Depth | V1 | V6 | V7 | QRISP |
+| Normals | V2 | V8 | V9 | Separate extension |
+| Depth and normals | V3 | V10 | V11 | Separate extension |
 
-- Primary: Qualcomm QRISP from Mercier et al. (ICCV 2023): https://www.qualcomm.com/developer/software/qualcomm-rasterized-images-dataset
-- Grounded published modalities: 540p color (non-jittered `MipBiasMinus1`), 540p packed depth (`DepthMipBiasMinus1`), 540p motion EXR (`MotionVectorsMipBiasMinus1`), 1080p `Enhanced` target, camera metadata. 2× output: 960×540 → 1920×1080.
-- Published dataset: 13 scenes, ten development scenes (7,260 frames) and three evaluation scenes (1,500 frames). Hold the latter untouched. Hold two development scenes for validation, chosen and documented before tuning. Inspect near-duplicate/asset-family overlap; do not overclaim independent content.
-- Non-jittered, fixed mipmap bias in primary study; jittered condition only as an explicit separate secondary experiment. Document licenses, acquisition, hashes, file identities, frame/segment boundaries, alignment, and validity before using QRISP.
-- Surface normals are **not documented** as part of QRISP. A depth-derived normal map cannot support an independent-normal hypothesis. Normal variants stay conditional until independently sourced normals are validated.
+The matrix retains PR #5’s IDs. The earlier seven-variant proposal’s V6 maps to V11 here. Identify runs by protocol revision as well as variant. Independent normals would require matching captures and same-source controls for every comparison. Depth-derived normals would answer a different question about depth encoding.
 
-### Matrix (current RGB present in every variant)
+| Quantity (scene-balanced PSNR in dB) | Matched contrast |
+|---|---|
+| Depth benefit with absent / unaligned / aligned history | V1 − V0 / V6 − V4 / V7 − V5 |
+| Benefit of adding one unaligned frame without / with depth | V4 − V0 / V6 − V1 |
+| Benefit of alignment without / with depth | V5 − V4 / V7 − V6 |
+| Change in alignment benefit when depth is present | (V7 − V6) − (V5 − V4) |
 
-| ID | Depth | Normals | Previous-frame RGB | Alignment | Scope |
-|---|---|---|---|---|---|
-| V0 | No | No | No | -- | Core |
-| V1 | Yes | No | No | -- | Core |
-| V2 | No | Yes | No | -- | Conditional |
-| V3 | Yes | Yes | No | -- | Conditional |
-| V4 | No | No | Yes | Unaligned | Core |
-| V5 | No | No | Yes | Motion aligned | Core |
-| V6 | Yes | No | Yes | Unaligned | Core |
-| V7 | Yes | No | Yes | Motion aligned | Core |
-| V8 | No | Yes | Yes | Unaligned | Conditional |
-| V9 | No | Yes | Yes | Motion aligned | Conditional |
-| V10 | Yes | Yes | Yes | Unaligned | Conditional |
-| V11 | Yes | Yes | Yes | Motion aligned | Conditional |
+The directional expectations are positive single-frame depth gain and positive alignment gain at both depth settings. Estimate the interaction in either direction. Compute each difference within the same scene and seed before averaging.
 
-Core QRISP comparisons: V1–V0 for depth, V5–V4 for alignment without depth, V7–V6 for alignment with depth, and (V7–V6)–(V5–V4) for alignment-by-depth interaction. The V6 identifier **does not** retain its meaning in the older matrix; revise any external notes before final runs. Geometry + history without motion alignment is necessary for isolating geometry-conditioned alignment.
+Jitter is off for every core row. A secondary experiment could retrain V4 and V5 using the jittered versions of all corresponding LR buffers, the same Enhanced target, splits and seeds. Compare the alignment gain against the non-jittered gain. The CNN receives no explicit offset channels. Check relative jitter in the motion field before applying any correction. Learned intermediate CNN activations exist in every model. A recurrent feature buffer exists in none of them.
 
-### Model and training proposal
+## Preparation and training
 
-- Same nonrecurrent 32-feature residual CNN, four residual blocks, subpixel 2× head, bilinear RGB skip. All models have ten input slots (RGB 3 + depth 1 + normals 3 + history 3), with absent slots zeroed. Parameter count, active inputs, preprocessing time and actual runtime reported per variant.
-- A single previous *low-resolution rendered RGB frame* is used as history; motion alignment is deterministic bilinear warping, not a learned extra motion input. Establish EXR channel order, motion sign/scaling and warp validity empirically. Avoid leaking history across segments; evaluate all variants on same eligible non-first frames.
-- Pilot recommendation: 64×64 LR/128×128 HR crops, L1 loss, AdamW LR 1e-3, batch eight, 20k updates, validation every 1k updates, three full-run seeds. These values are provisional until a small speed/validity pilot establishes feasibility; freeze them before final test runs. No geometric flip/rotation augmentations without adjusting and testing motion vectors.
-- Record dataset hash, split manifest, scene-family overlap assessment, seed, Git revision, software versions, checkpoint, and all metric/timing settings. Retain raw downloaded dataset out of Git.
+1. Acquire a training scene (for example CB-Apocalypse) using the distributor’s per-scene instructions. Record the archive hashes, expanded size, segment IDs and package versions. Store raw data and checkpoints outside Git.
+2. Read stored RGB bytes in RGB order, discard color alpha and divide by 255. Decode packed depth using all four byte channels per Annex A, Eq. 4. Keep the resulting near-to-far values. Check paired frame identities, crop alignment, byte order, motion finiteness and depth range on training captures. Investigate unexpected values before freezing the manifest.
+3. Decode vertical then horizontal EXR velocities and scale by the corresponding LR dimension. Verify axis sign and current-to-previous source coordinates using trackable training-scene motion. Test identity and one-pixel translations on a synthetic grid. Bilinearly sample full-frame previous RGB with half-pixel centers and replicated borders before cropping. Supply no motion-derived mask, depth dilation or raw velocity channels to the CNN.
+4. Use the ten-slot, 32-channel residual CNN specified in the manuscript (four blocks, PixelShuffle 2× and a bilinear RGB skip). Omitted slots contain zeros. Draw eligible training pairs uniformly with replacement, then a uniform valid 64×64 LR crop and its corresponding 128×128 HR target. Save the draws and use identical initial weights and draws across variants for each of seeds 17, 29 and 43.
+5. Train independently using mean L1 on unclipped output, AdamW at constant 0.001, betas (0.9, 0.999), epsilon 1e−8 and weight decay 0.01. Proposed batch size is eight, with 20,000 updates and full validation every 1,000. Select the highest mean validation-scene PSNR with ties going to the earlier checkpoint.
+6. Pilot both V0 and V7 in FP32 on the 8-GB RTX 4060 to include the cost of motion I/O, warping and validation. For each pilot record peak allocated memory, updates/s, validation wall time and I/O/cache settings. Estimate time for 18 training runs (360,000 updates plus 360 validation passes). Apply any resource-driven budget or precision adjustment to every variant before final training.
 
-### Evaluation and limitations
+## Evaluation and reporting
 
-- PSNR (per-frame before averaging, range [0,1]) primary; SSIM complementary; bicubic non-neural baseline. Optional perceptual/temporal assessments only when their precise input and calculation conventions are fixed.
-- Report per-scene and per-seed outcomes and paired differences, not naive frame-level confidence intervals. 3 held-out scenes limit statistical inference.
-- Bench network-only and GPU pipeline including history warping separately, full 1080p batch-one, warmed-up CUDA event timing. No claim of UE integration or true frame-budget feasibility from offline measurements alone.
-- Source: Mercier et al. supplement, https://openaccess.thecvf.com/content/ICCV2023/supplemental/Mercier_Efficient_Neural_Supersampling_ICCV_2023_supplemental.pdf (Annex A, Tables 4–5). Verify downloaded files before committing final details.
-
-### Pilot gates
-
-1. Access QRISP under applicable terms; inspect one segment with all core modalities and metadata.
-2. Confirm 540p↔1080p pairing, depth decode, EXR channel order, motion direction/jitter conventions and image pipeline.
-3. Measure V0 pilot throughput/memory; run a non-learning warp sanity check; decide feasibility of 20k updates × 3 seeds.
-4. Freeze dataset scene list, splits, model, loss, metric and timing protocols before final runs, after both authors review.
-
----
-
-## Historical seven-variant matrix (superseded by QRISP draft above)
-
-V0 is the color-only single-frame baseline; V1–V3 add depth and normals individually and together. The temporal extension adds history to color, compares unaligned and motion-aligned history, then adds depth and normals together. All variants are proposed, subject to buffer availability and final protocol agreement.
-
-| Variant | Color | Depth | Normals | History | Purpose |
-|---|---|---|---|---|---|
-| V0 | Yes | No | No | No | Single-frame baseline |
-| V1 | Yes | Yes | No | No | Depth relative to V0 |
-| V2 | Yes | No | Yes | No | Normals relative to V0 |
-| V3 | Yes | Yes | Yes | No | Combined spatial inputs |
-| V4 | Yes | No | No | Unaligned | Unaligned history relative to V0 |
-| V5 | Yes | No | No | Motion aligned | Alignment relative to V4 |
-| V6 | Yes | Yes | Yes | Motion aligned | Joint depth and normal addition relative to V5 |
-
-V3 versus V1 and V3 versus V2 estimate the incremental contribution of normals with depth and depth with normals, respectively. V5 versus V4 tests alignment only if history and temporal processing are otherwise matched. V6 versus V5 tests the two geometric inputs together; V6 versus V3 compares the combined temporal variant with the single-frame counterpart. The matrix does not isolate motion vectors without history, separate depth or normal effects in aligned history, or every interaction.
-
-Use scene-disjoint training, validation, and test splits; reserve test frames from fitting and protocol selection. Use the same evaluation scenes and timing boundaries across variants. Hold training data and budget, loss, optimizer, and schedule constant where applicable. Input encoding, normalization, channel count, and processing must be specified. A shared base architecture may still change parameter count or processing across variants: control capacity where feasible, report parameter counts and complexity, and acknowledge residual differences when interpreting results. The architecture, temporal implementation, hardware, scale, and number of seeds remain open.
-
-## Provisional evaluation protocol
-
-No metrics have been run. Finalize these choices after fixing the image pipeline and before evaluating test scenes:
-
-- **PSNR and SSIM:** candidate full-reference framewise measures of pixel fidelity and local structure, respectively. Neither establishes human-perceived quality or temporal stability. Fix implementation/version, reference alignment and synchronization, crop and invalid pixels, color representation and range, exposure and tone mapping, channels, PSNR peak and whether to average before or after the logarithm, and SSIM window and scale.
-- **FLIP:** candidate spatial perceptual difference maps. If FLIP is selected, consider LDR-FLIP for appropriately prepared display-ready LDR images, or the distinct HDR-FLIP for HDR inputs, which combines maps over exposed and tone-mapped image pairs. Fix implementation/version, input representation, alignment, viewing/display assumptions, map pooling and, for HDR, exposure range, sampling and tone mapping. Maps predict differences rather than prove human preference. Sources: [LDR-FLIP](https://doi.org/10.1145/3406183), [HDR-FLIP](https://doi.org/10.2312/egs.20211015).
-- **LPIPS:** optional learned-feature perceptual distance, included only if it provides useful complementary information for the chosen rendering pipeline. Fix implementation/version, backbone and weights, normalization, input color representation, alignment and pooling. It does not establish human preference; framewise LPIPS and FLIP do not measure temporal stability. [Original LPIPS paper](https://openaccess.thecvf.com/content_cvpr_2018/html/Zhang_The_Unreasonable_Effectiveness_CVPR_2018_paper.html).
-- **Temporal stability:** consider measuring pixel-wise temporal variation on verified static segments alongside the reference, as in the restricted static-segment analysis of [Mercier et al.](https://openaccess.thecvf.com/content/ICCV2023/papers/Mercier_Efficient_Neural_Supersampling_on_a_Novel_Gaming_Dataset_ICCV_2023_paper.pdf), and inspect synchronized reference/output videos for moving scenes. Fix static-segment criteria, frame rate, duration, reset handling, clip selection and playback conditions. Static variation cannot characterize motion, and blur can appear stable. Consider a motion-compensated temporal error only if reliable correspondence and visibility masks are available; fix motion source, warp, exclusions and implementation independently of variants, report coverage, and account for errors from motion, occlusion and lighting. Neither selected clips nor a single score establishes general perceptual temporal quality.
-
-For all measures, fix reference alignment, frame synchronization, preprocessing, metric version and aggregation across pixels, frames, sequences, scenes and seeds. Report scene-level results and summary weighting, and use consistent settings across variants. Choose representative crops and clips showing edges, thin structures and disocclusions as descriptive examples. For systematic regional measurements, define independent masks and selection rules before test analysis, report region counts and coverage, and account for metrics whose windows cross mask boundaries. Without reliable masks, do not present selected crops as regional statistics.
-
-Metric computation, reference preparation and inspection are evaluation overhead, not deployment latency. Separately specify whether deployment timing covers inference, buffer preparation, warping, storage and transfers; document hardware, warm-up, measurement boundaries and unmeasured costs. Runtime and memory remain provisional until the protocol is frozen.
-
-## Planned workflow
-
-1. Review literature and choose defensible baselines and metrics.
-2. Write the final protocol and freeze data splits and comparison conditions.
-3. Build a tiny pilot to validate rendering buffers, alignment, and timing instrumentation.
-4. Run the baseline and each selected ablation with the agreed training budget and seeds.
-5. Evaluate image quality, visual failures, runtime, memory, and model size on held-out scenes.
-6. Analyze effect sizes and uncertainty; report negative as well as positive results.
-7. Link every figure/table in the paper to its run IDs and source data.
-
-## Future repository layout (do not create until needed)
-
-```text
-05_Experiments/
-  EXPERIMENT_PLAN.md
-  EXPERIMENT_MATRIX.csv
-  RUN_LOG.csv
-  configs/
-  results/                 # small, selected summary tables only
-code/                     # implementation and tests
-figures/                  # source plots and selected paper figures
-```
-
-Large datasets, checkpoints, and raw outputs should live outside ordinary Git history, with stable links and checksums recorded in the run log.
-
-## Gate before the first full run
-
-Write the reproducibility policy: configuration format, Git commit, seeds, data version/split, GPU and software versions, timing method (including warm-up), metric implementations, checkpoint location, and result naming. Have both authors review it before collecting final results.
+- Score the same eligible full frames, including borders and UI, with predictions clipped to [0,1] and references in the stored RGB encoding. Include bicubic interpolation using half-pixel centers. Average RGB PSNR in dB over frames within scenes, then give each test scene equal weight. Secondary SSIM uses range one, 11×11 valid Gaussian windows, sigma 1.5, standard constants, population covariance and channel averaging.
+- For temporal error, subtract the reference RGB change from the output RGB change over consecutive scored frames. Average absolute values over pixels and channels, then frames within each scene and scenes equally. This leaves 1,490 test transitions if the inventory is intact. Report alongside synchronized clips since ordinary spatial error on moving edges also affects this score.
+- Show scene-by-seed values, matched contrasts, and the mean and range across seeds. Report all three scenes individually. Do not treat adjacent frames as independent replicates.
+- Time full-frame batch-one inference and the resident-buffer pipeline separately. The pipeline includes input assembly, any motion conversion and warping, network execution and clipping. Report CUDA-event median and p95 across 200 fixed frames after 50 warm-ups, peak allocated memory after a warm-up reset, and the GPU, driver, software and precision. Measure each pipeline in isolation. Disk, CPU transfers, rendering and quality metrics are outside these timings.
+- Save run IDs, Git SHA, input hashes, split/crop manifests, environment, validation trace, selected checkpoint and raw frame-level scores alongside the summaries. Offline timings do not establish an in-engine frame rate.
