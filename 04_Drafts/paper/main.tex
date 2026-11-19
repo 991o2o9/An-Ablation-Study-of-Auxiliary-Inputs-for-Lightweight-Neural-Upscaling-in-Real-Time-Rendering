@@ -322,7 +322,10 @@ used by Mercier et al.'s complete temporal system
 
 \subsection{Training and Reproducibility}
 Training will use aligned $64\times64$ LR patches and corresponding
-$128\times128$ HR target crops. A common random sampling manifest will
+$128\times128$ HR target crops. For temporal inputs, motion-based warping
+will be computed in full-frame coordinates \emph{before} extracting
+corresponding crops, avoiding artificial displacement discontinuities
+at patch boundaries. A common random sampling manifest will
 identify eligible scenes, segments, and crop coordinates for all
 variants, with patch origins adjusted consistently for any optional
 jitter condition. Training uses an L1 loss in the fixed RGB
