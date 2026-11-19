@@ -104,13 +104,16 @@ model size \cite{wen2025cgsr}. This is an existing rendering-input ablation,
 but its sequential design and network optimization couple input choice to
 changes in capacity.
 
-Zheng et al.\ place normals and material information in a detail-reconstruction
-module, while depth and motion constrain temporal feature refinement
-\cite{zheng2025rdg}. Their ablations compare decoupled guidance against
-concatenation and alternative fusion modules. They show that the way signals
-are combined matters, rather than isolating each buffer's contribution.
-Together, these studies motivate examining depth and normals individually
-and together while distinguishing input choice from fusion design.
+Zheng et al.\ remove individual buffers from RDG-s. At $4\times$,
+its mean PSNR falls from 29.37 to 29.27 dB without normals, to
+29.33 dB without depth, and to 29.00 dB when motion alignment is
+disabled \cite[Table~3]{zheng2025rdg}. Each removal is measured with
+the other cues present. The all-buffers-off row also removes the
+material input, so it cannot supply the missing depth-by-alignment
+comparison. Wang et al.\ likewise ablate individual geometry channels
+at output resolution \cite{wang2025taming}. The resolution of a buffer
+matters here: an HR silhouette can supply edge locations unavailable to
+a network receiving geometry only on the LR grid.
 
 \subsection{Temporal History, Alignment, and Failure Cases}
 Temporal history can supply samples missing from the current frame, provided
@@ -137,12 +140,17 @@ LPIPS, although their thin-object example favors dilation
 \cite{mercier2023efficient}. Such cases make localized artifacts relevant to
 interpreting reconstruction quality, even when aggregate scores improve.
 
-Taken together, these studies motivate examining renderer-provided geometry
-and temporal history in relation to both reconstruction quality and
-computational cost. Prior work already includes input and alignment
-ablations, but their effects depend on model design, fusion, and rendering
-conditions. Our study aims to clarify these trade-offs in a selected
-lightweight model and rendering setup.
+Brandner's master's thesis crosses access to a bundle of G-buffers with
+forward warping of two previous frames. On the Egypt overview sequence,
+warping improves PSNR by 0.04 dB at either buffer setting to the precision
+reported \cite[Table~5.5]{brandner2024urtsr}. This directly anticipates
+the crossed design. Our experiment asks which part of that relationship
+can be attributed to current LR depth alone, using one previous RGB
+frame and the same CNN across scene and seed comparisons. A recent
+preprint also shows that registration can change the effect of a
+temporal loss in a recurrent supersampler \cite{yu2026frozen}. We
+restrict the core comparison to a framewise loss and an explicitly
+checked warp.
 
 \section{Method}
 \label{sec:method}
@@ -225,10 +233,16 @@ $q_4-q_0$ and $q_6-q_1$ measure adding unaligned history. Depth gains
 with unaligned and aligned history are $q_6-q_4$ and $q_7-q_5$.
 These comparisons concern this model and this quality scale.
 
-QRISP documents no independent normal buffer. A normal map reconstructed
-from depth would test a transformation of depth. If a second capture
-source provides normals, we would run both the normal variants and
-their controls on that same source. If jitter is studied, a small
+QRISP documents no independent normal buffer. For the full matrix,
+He et al.'s STSS captures pair 540p with 1080p and include rendered
+normals, depth, and motion \cite{he2024stss}. A switch would use
+supersampling frames only and verify the unwarped RGB history,
+motion convention, and scene split on that source. Zheng et al.'s
+Cycles data provide the same cues for a separate $4\times$ comparison
+\cite{zheng2025rdg}. In either case all geometry conditions and controls
+would be trained and scored within the selected dataset. Normals
+reconstructed from depth would test a different representation of depth.
+If jitter is studied, a small
 secondary comparison would retrain V4 and V5 on their matched jittered
 captures with the same mipmap bias, targets, splits, and seeds. The CNN
 would receive no offset channels in either condition. We would use the
@@ -302,6 +316,17 @@ same pixel-center convention and scoring rules. Secondary SSIM uses
 an $11\times11$ Gaussian window ($\sigma=1.5$), range one, standard
 constants $K_1=0.01$, $K_2=0.03$, population covariance and valid windows,
 averaged over channels \cite{wang2004ssim}.
+
+To check whether an image-wide average hides a depth benefit near
+silhouettes, we will also report paired mean absolute RGB error within
+and away from depth discontinuities. At each LR pixel we compute the
+largest absolute depth difference to its in-bounds four-connected
+neighbors. We fix the threshold at the 90th percentile across eligible
+training pixels and mark test pixels strictly above it. Each LR label
+covers its corresponding $2\times2$ HR pixels. All variants use the
+same evaluation mask. We report pixel coverage and scene-level results
+for both regions. This mask measures changes in screen-space depth;
+it does not identify visibility changes between frames.
 
 To describe temporal behavior, we will also report the mean absolute
 difference between successive output changes and reference changes in
