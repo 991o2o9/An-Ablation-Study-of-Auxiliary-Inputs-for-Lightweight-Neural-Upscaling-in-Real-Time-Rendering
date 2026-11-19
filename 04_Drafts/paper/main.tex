@@ -68,15 +68,15 @@ miss thin-object artifacts \cite{mercier2023efficient}. These findings
 identify useful inputs and evaluation concerns, but their effects depend on
 the model, rendering setup, and processing used for each comparison.
 
-We plan a controlled study of auxiliary inputs for a lightweight neural
-upscaler. Under a shared experimental protocol, we intend to compare depth
-and normals individually and together, then compare unaligned with
-motion-aligned history and examine the joint addition of depth and normals
-to aligned history. We will assess reconstruction quality alongside measured
-runtime and memory costs, variation across held-out scenes, and spatial
-failure cases. This is a proposed comparison within a specific setup, not a
-claim that input or alignment ablations are new. The architecture, data, and
-measurement boundaries remain to be fixed before experiments.
+We propose a controlled study of auxiliary inputs for a lightweight neural
+upscaler using Mercier et al.'s QRISP dataset
+\cite{mercier2023efficient}. Our primary comparisons isolate depth and
+motion-alignment effects on matched current-frame and single-history
+inputs, with reconstruction quality, runtime, memory, and scene-level
+variation evaluated under one protocol. Surface-normal comparisons remain
+conditional because QRISP does not document a surface-normal modality.
+This is not a claim that auxiliary-input or alignment ablations are new;
+the model and data checks remain to be validated experimentally.
 
 \section{Background and Related Work}
 \subsection{Efficient Neural Reconstruction}
@@ -145,174 +145,275 @@ conditions. Our study aims to clarify these trade-offs in a selected
 lightweight model and rendering setup.
 
 \section{Method}
-\subsection{Study Design and Analysis Topics}
-We plan to study a color-only single-frame baseline (V0) and three spatial
-variants that add depth (V1), normals (V2), or both (V3). A planned temporal
-extension adds unaligned history to color (V4), aligns that history using
-motion vectors (V5), and adds depth and normals together to aligned history
-(V6). Table~\ref{tab:variants} summarizes the proposed inputs. The temporal
-model and the representation of history remain to be selected.
+\label{sec:method}
+This section specifies a \emph{proposed} reproducible protocol, to be
+confirmed by a small dataset-inspection and training pilot before final runs.
+No model has yet been trained and no performance results have been collected.
+The primary study uses the Qualcomm Rasterized Images for Super-resolution
+Processing (QRISP) dataset introduced by Mercier et al.\
+\cite{mercier2023efficient}. We distinguish comparisons supported by its
+documented modalities from extensions requiring new data.
+
+\subsection{Dataset, Resolution, and Splits}
+\paragraph{Source and sampling.}
+QRISP contains 8,760 frames from 13 rendered scenes, captured as 60-fps
+sequences: 7,260 frames in ten development scenes and 1,500 frames in three
+published test scenes. Its modalities are low-resolution color, depth, motion
+vectors, and metadata describing camera parameters and per-frame jitter;
+surface normals are \emph{not} among the documented modalities
+\cite{mercier2023efficient}. The official distribution, supplement, and
+research-use license will be retained with the experiment record; availability
+of individual files must be verified after download.
+The primary proposed experiment is 2$\times$ upscaling from
+$960\times540$ to $1920\times1080$. We pair the \texttt{MipBiasMinus1}
+non-jittered 540p color render and matching 540p depth/motion captures
+with the dataset's \texttt{Enhanced} 1080p color reference. Unlike a
+synthetically downsampled input, this is a native low-resolution render.
+The enhanced reference was constructed by downsampling a 2160p
+render with 8$\times$ MSAA \cite{mercier2023efficient}.
+A separate, predeclared experiment may examine the corresponding
+\texttt{Jittered} modalities and camera offsets; no jitter comparison is
+included in the primary variant numbers below.
+
+\paragraph{Scene separation.}
+We will preserve the dataset's three published evaluation scenes as a
+completely untouched test partition. Before tuning, two of the ten
+development scenes will be designated for validation; the remainder will
+be used for training. Scene choice will be documented with a manifest and
+checked for overlapping scene families or shared assets. Sequences and
+frames from a validation or test scene will not enter training, model
+selection, or data-driven preprocessing. If a reduced pilot subset is used,
+it will be labeled \emph{pilot only}; final comparisons require an approved,
+fixed split. Scene-disjoint evaluation on this dataset does not establish
+generalization to all rendering engines.
+
+\paragraph{Integrity and preprocessing.}
+The supplementary dataset description specifies 8-bit RGBA PNG color,
+32-bit depth values packed into four 8-bit PNG channels, and two-channel
+16-bit EXR motion vectors. The documented packed-depth reconstruction is
+$D=R/255+G/255^2+B/255^3+A/255^4$, using the unsigned byte
+channel values. Motion is stored as vertical velocity followed by
+horizontal velocity, normalized to $[-1,1]$; conversion to pixel
+displacement requires the appropriate image dimensions and a validated
+vertical-axis sign. All modality paths, channel order, numerical ranges,
+frame indices, and camera metadata will be checked empirically on a
+downloaded sample before use. Depth normalization and invalid-pixel
+handling will be fixed using training-set rules only, and the alpha channel
+will not silently be treated as a depth or validity mask. LR color and HR
+reference RGB will use a single documented color representation and
+normalization, identical across variants. Sequence boundaries are
+preserved: no history may cross a segment boundary. The first frame of
+each segment is excluded from the primary paired temporal comparison so
+all models are evaluated on exactly the same eligible frames.
+
+\subsection{Ablation Design}
+\label{sec:variants}
+Every learned variant receives current low-resolution RGB. The optional
+geometry is \emph{current-frame} depth (D) or surface normals (N).
+History (H) denotes the immediately preceding low-resolution RGB frame:
+either fed without warping (U) or resampled into current-frame coordinates
+using the current motion field (A). The network receives \emph{warped
+history color}, not raw motion vectors as an additional learned input.
+All temporal variants use precisely one previous frame; they do not
+maintain recurrent predicted features. This isolates alignment more
+directly than changing the temporal architecture at the same time.
 
 \begin{table*}[t]
 \centering
-\caption{Planned input variants (V0 is the color-only baseline).}
+\caption{Proposed 2$\times$ auxiliary-input ablations. Current LR RGB is
+present in all variants; primary QRISP experiments use non-jittered inputs.
+\emph{Core} uses documented QRISP modalities. \emph{Conditional} requires
+independently validated surface-normal data.}
 \label{tab:variants}
-\begin{tabular}{llcccc}
+\small
+\begin{tabular}{lcccll}
 \hline
-ID & Group & Color & Depth & Normals & History \\
+ID & Depth & Normals & Previous LR RGB & Alignment & Feasibility \\
 \hline
-V0 & Single frame & yes & -- & -- & -- \\
-V1 & Single frame & yes & yes & -- & -- \\
-V2 & Single frame & yes & -- & yes & -- \\
-V3 & Single frame & yes & yes & yes & -- \\
-V4 & Temporal & yes & -- & -- & unaligned \\
-V5 & Temporal & yes & -- & -- & motion aligned \\
-V6 & Temporal & yes & yes & yes & motion aligned \\
+V0  & --  & --  & --  & --             & Core \\
+V1  & yes & --  & --  & --             & Core \\
+V2  & --  & yes & --  & --             & Conditional \\
+V3  & yes & yes & --  & --             & Conditional \\
+V4  & --  & --  & yes & unaligned      & Core \\
+V5  & --  & --  & yes & motion-aligned & Core \\
+V6  & yes & --  & yes & unaligned      & Core \\
+V7  & yes & --  & yes & motion-aligned & Core \\
+V8  & --  & yes & yes & unaligned      & Conditional \\
+V9  & --  & yes & yes & motion-aligned & Conditional \\
+V10 & yes & yes & yes & unaligned      & Conditional \\
+V11 & yes & yes & yes & motion-aligned & Conditional \\
 \hline
 \end{tabular}
 \end{table*}
 
-\paragraph{Individual and combined geometric inputs.}
-V1 versus V0 estimates the effect of depth, and V2 versus V0 estimates the
-effect of normals, subject to the capacity and processing controls below.
-V3 versus V1 estimates the incremental effect of normals with depth, while
-V3 versus V2 estimates the incremental effect of depth with normals.
-Together, these comparisons can examine overlap between their contributions
-in the single-frame setting.
+The six \emph{core} variants V0, V1, V4--V7 allow a depth contrast
+(V1--V0); a history contrast (V4--V0); alignment contrasts without depth
+(V5--V4) and with depth (V7--V6); and an alignment-by-depth
+interaction, $(V7-V6)-(V5-V4)$, with differences calculated on a
+predefined quality scale. The six conditional normal variants complete
+the four geometric combinations crossed with both history conditions.
+We will not claim to test independent surface normals on QRISP unless
+real renderer-provided normals become available: normals reconstructed
+from depth would instead be an explicitly labeled \emph{derived-depth
+feature} control, not an independent-normal experiment.
+The previous V6 designation (depth plus normals with aligned history)
+is replaced by the systematic numbering in Table~\ref{tab:variants};
+the updated experiment log must use these IDs consistently.
 
-\paragraph{Temporal history and alignment.}
-V4 versus V0 examines adding unaligned history, with any differences in
-temporal processing taken into account. V5 versus V4 tests motion alignment
-provided that history and temporal processing are otherwise matched. V6
-versus V5 tests adding depth and normals together to aligned history; V6
-versus V3 compares the combined temporal and single-frame variants. These
-comparisons do not isolate the separate effects of depth and normals with
-aligned history, motion vectors without history, or every interaction among
-the inputs.
-
-\paragraph{Quality, cost, and generalization.}
-We plan to compare reconstruction quality with the selected runtime and
-memory measurements. Training, validation, and test scenes will be disjoint
-at the scene level; test frames will not be used for fitting or protocol
-selection. We will examine whether variant differences persist across
-held-out scenes and how they vary among them. An unseen scene does not by
-itself establish a distribution shift.
-
-\paragraph{Spatial benefits and failures.}
-Alongside aggregate quality, we plan to inspect where variants help or hurt,
-including geometric edges, thin structures, and regions newly revealed by
-motion. Error maps and selected image regions can expose local effects that
-may be obscured in whole-image averages.
+\paragraph{Jitter, motion, and learned features.}
+Jitter is a \emph{capture condition}, not an extra auxiliary modality in
+the primary non-jittered matrix. If the optional jittered condition is
+added, the same variants will be repeated on matched jittered sequences,
+with camera offsets available to all variants and explicit jitter
+compensation in warping; results will be stratified by condition rather
+than mixed into the main estimates. Mipmap bias and target construction
+must remain fixed within each comparison. Predicted recurrent features
+are \emph{not} part of this architecture; adding them would be a
+separate architecture ablation rather than a simple feature column.
+Depth-informed motion-vector dilation is also omitted from the main
+alignment comparison because including it only for one treatment would
+confound the effect of warping.
 
 \paragraph{Hypotheses.}
-The following are expectations to be assessed after experiments; they may be
-supported or refuted.
+The following are testable expectations, not findings.
 \begin{description}
-\item[H1] Adding depth improves quality over color-only input.
-\item[H2] Adding surface normals improves quality over color-only input.
-\item[H3] Depth and normals are partly redundant, so using both improves
-quality by less than the sum of their individual gains.
-\item[H4] History warped with motion vectors improves quality over history
-used without alignment.
-\item[H5] Improvements of selected auxiliary-input variants over their
-matched baselines persist on scene-disjoint test scenes.
+\item[H1] Adding depth improves single-frame quality (V1 versus V0).
+\item[H2] If independent normals are available, normals improve
+single-frame quality (V2 versus V0).
+\item[H3] If normals are available, depth and normals yield a
+subadditive gain in the selected quality metric:
+$(V3-V0)<(V1-V0)+(V2-V0)$. This is a metric-scale
+interaction, not proof of information-theoretic redundancy.
+\item[H4] Motion alignment improves history-based reconstruction,
+both without depth (V5 versus V4) and with depth (V7 versus V6).
+\item[H5] Differences persist, subject to uncertainty, on the
+held-out scenes rather than being confined to training scenes.
 \end{description}
 
-\paragraph{Controls and interpretation.}
-We plan to use a shared base architecture while varying inputs. A shared
-design does not imply identical parameter counts: input channel changes
-affect the first layer, and temporal variants may require additional
-processing. Training data, loss, optimizer, and schedule should be held
-constant where applicable. We plan multiple random seeds, with the number to
-be determined. We will report parameter counts and computational complexity,
-and control capacity where feasible, for example by matching parameter
-budgets. Any remaining differences in capacity or processing will be
-acknowledged when interpreting quality and cost. The architecture, temporal
-implementation, and final protocol remain to be fixed.
-The cited prior systems are methodological references, not implemented
-experimental baselines; any comparator beyond V0 remains undecided.
+\subsection{Neural Architecture and Temporal Processing}
+A small fully convolutional residual CNN is proposed for every learned
+variant, with 32 hidden feature channels, an initial $3\times3$
+convolution, four two-convolution residual blocks, and a final
+convolution yielding 12 channels followed by
+\texttt{PixelShuffle(2)}. Its predicted HR residual is added to
+bilinear-upsampled current RGB. The network operates chiefly at LR
+resolution. To control nominal parameter count, each variant uses the
+same input tensor slots: current RGB (3), depth (1), normals (3), and
+history RGB (3), totaling ten channels. Absent modalities are zero-filled
+under a fixed representation, and a \emph{separate model is trained from
+scratch for each variant}. Active parameter use still varies by input,
+so model size, active channels, computational cost, and latency will all
+be reported.
 
-\subsection{Model, Inputs, and Data}
-% TODO: Specify architecture, input preprocessing, scenes, splits, resolution, and scale.
-The architecture, input preprocessing, scenes, resolution, and upscaling
-factor are to be selected. The training, validation, and test scene lists
-and the method for producing aligned or unaligned history will be fixed
-before any experiments are run.
+For V5, V7, V9, and V11, the previous LR color is warped with bilinear
+sampling using current-frame motion vectors. The motion-vector channel
+order, normalized-to-pixel conversion, current-to-previous sign,
+sampling-coordinate convention, border handling, and any occlusion mask
+will be established using numerical warp checks and recorded. For
+V4, V6, V8, and V10, the \emph{same} previous LR color is supplied
+without warping. Warping is deterministic and does not change the
+learned network; the input size and the number of historical frames are
+the same for matched aligned and unaligned models. Any validity mask
+introduced for aligned history must also be provided identically to
+its unaligned counterpart or excluded from this primary contrast.
+This design does not evaluate the recursive feature-and-output history
+used by Mercier et al.'s complete temporal system
+\cite{mercier2023efficient}.
 
-\subsection{Evaluation Protocol}
+\subsection{Training and Reproducibility}
+Training will use aligned $64\times64$ LR patches and corresponding
+$128\times128$ HR target crops. A common random sampling manifest will
+identify eligible scenes, segments, and crop coordinates for all
+variants, with patch origins adjusted consistently for any optional
+jitter condition. Training uses an L1 loss in the fixed RGB
+representation, AdamW, an initial learning rate of $10^{-3}$, and a
+provisional batch size of eight. The proposed full-run budget is 20,000
+optimizer updates per variant with validation every 1,000 updates,
+selecting a checkpoint by validation PSNR; these numbers will be
+revised \emph{once, before freezing the protocol}, if a measured
+end-to-end pilot shows that they are not feasible on the 8-GB RTX 4060.
+Fixed-budget comparison is preferred to training each variant for
+different amounts of wall-clock time. Mixed precision may be used if
+numerical and repeatability checks pass. Random cropping is the
+default augmentation; spatial flips/rotations will not be used unless
+the corresponding motion-vector and camera-coordinate transforms are
+implemented and tested. All full comparisons will be repeated with
+three recorded random seeds.
+
+Each run will record the Git revision, dataset version and checksum,
+exact scene/segment manifest, input condition, crop sampling policy,
+model configuration, optimizer, schedule, seed, package versions,
+hardware, checkpoint path, and validation history. No test images
+will be used for hyperparameter selection. Reported experiments may
+start only after dataset formats and the split are checked and both
+authors approve the frozen protocol. No dataset download, completed
+run, or training result is asserted here.
+
+\subsection{Evaluation and Statistical Analysis}
 \label{sec:metrics}
-The following evaluation choices are provisional until the image pipeline and
-protocol are fixed. No measurements have yet been made. We propose PSNR and
-SSIM for reference-image reconstruction: PSNR summarizes pixel error, while
-SSIM compares local image structure \cite{wang2004ssim}. Neither establishes
-perceptual quality or temporal stability on its own.
+Our primary fidelity measure will be RGB PSNR evaluated per frame on
+normalized $[0,1]$ predictions and references, with peak value one:
+$\mathrm{PSNR}=10\log_{10}(1/\mathrm{MSE})$. PSNR will be computed for
+each frame before averaging, not computed from a pooled MSE. SSIM will
+be a complementary image-structure measure \cite{wang2004ssim};
+its implementation, version, Gaussian window, channel order, and
+\texttt{data\_range=1} will be fixed in code before test evaluation.
+We will use exactly the same frame identifiers, spatial crop, channel
+policy, invalid-pixel mask, and color encoding for all variants.
+Per-frame results will first be summarized within each scene and
+seed; primary summaries will weight held-out scenes equally and show
+their individual scores and paired differences. We will show
+seed-to-seed variation and scene-level uncertainty without treating
+adjacent frames as independent samples. With only three test scenes,
+any interval or significance claim will be qualified accordingly.
 
-For spatial analysis, FLIP is a candidate for perceptually motivated
-reference-image error maps \cite{andersson2020flip}. If evaluation uses
-low-dynamic-range (LDR) images, LDR-FLIP applies to the chosen display-ready
-images. If the study evaluates high-dynamic-range (HDR) images, HDR-FLIP is a
-distinct method that combines maps over exposure-compensated, tone-mapped
-image pairs \cite{andersson2021hdrflip}. The choice depends on the final
-pipeline. FLIP maps indicate estimated visible differences; they do not
-prove human preferences. LPIPS is an optional complementary learned-feature
-distance \cite{zhang2018lpips}, rather than a required metric: its additional
-value for these rendered images should be established before inclusion, and
-its score does not establish human preference. Framewise FLIP and LPIPS do
+Bicubic interpolation of the same LR input will be a non-neural
+reference. For spatial error analysis, LDR-FLIP is a candidate on
+consistently prepared display-referred images
+\cite{andersson2020flip}; HDR-FLIP is not appropriate for the
+documented 8-bit RGB samples without a separate HDR image pipeline
+\cite{andersson2021hdrflip}. LPIPS remains an optional complementary
+metric \cite{zhang2018lpips}, not evidence of human preference.
+Visual crops, synchronized output/reference sequences, and error
+maps will document both improvements and failures. Static-segment
+temporal variation may be measured where verified stationary
+segments exist; motion-compensated temporal errors require independent
+visibility/correspondence checks. Framewise image metrics alone do
 not establish temporal stability.
 
-We will select representative crops and sequences illustrating geometric
-edges, thin structures, and disocclusions, including cases where inputs help
-or hurt. Such examples are descriptive. Any systematic regional comparison
-requires independently defined masks, a selection rule fixed before test
-analysis, and reporting the number and coverage of regions; if reliable
-masks cannot be defined, we will not treat selected crops as regional
-statistics. Metric maps near mask boundaries may depend on context outside
-the region.
+We will report parameters, peak measured GPU memory, and warmed-up
+batch-one inference time at the full 1080p output size using CUDA
+events and synchronization. Timing will distinguish (i) network-only
+execution and (ii) offline GPU pipeline execution including motion
+conversion and history warping, while documenting transfers and
+other excluded costs. Inference and any warping must be measured on
+the same device, with fixed precision, warm-up counts, repetitions,
+and memory-allocation procedure. Evaluation metrics and reference
+processing are excluded from deployment latency. As this is an
+offline PyTorch experiment on an existing Unity-rendered dataset,
+we cannot claim measured Unreal Engine integration costs or a
+demonstrated real-time frame-rate budget merely from these timings.
 
-Temporal stability requires a separate sequence-level assessment. As a
-provisional quantitative option, we may examine temporal variation on
-verified static segments, alongside the reference sequence; Mercier et al.\
-use pixel-wise temporal standard deviation on a static scene segment
-\cite{mercier2023efficient}. This can reveal flicker in that restricted
-setting but does not characterize moving content, and a stable blurred output
-may score well. We also plan synchronized reference/output video inspection
-for moving scenes, including disocclusions, using predeclared selection and
-playback conditions. A motion-compensated temporal error may be considered
-if reliable correspondences and visibility masks are available: its motion
-source, warping and exclusions must be fixed independently of the variants.
-Warping errors, occlusion, lighting changes, and blur can confound the result;
-excluded pixels and coverage must be reported. Neither this measure nor
-selected videos alone would establish general temporal perceptual quality.
-
-Before testing, the protocol must specify implementation and version for
-each measure; reference alignment, frame synchronization, resolution and
-cropping; color space, transfer function, range, exposure and tone mapping;
-and the treatment of invalid pixels. For PSNR, specify peak value, channels,
-and whether aggregation precedes or follows the logarithm; for SSIM, specify
-window, scale, channels and range. For FLIP, specify the LDR or HDR variant,
-display and viewing assumptions, map pooling, and, for HDR, exposure and
-tone-mapping settings. If LPIPS is used, specify its backbone, weights, input
-normalization and pooling. For temporal assessment, specify static-segment
-criteria, frame rate, duration, reset handling and any correspondence and
-masking procedure. Fix aggregation across pixels, frames, sequences, scenes,
-and seeds; report per-scene results and the weighting used for summaries.
-These choices must apply consistently to the variants.
-
-Possible deployment costs include neural inference latency and GPU memory
-consumption, as well as buffer preparation, history warping and storage,
-data transfers, and total upscaling-pipeline time. The protocol must define
-measurement boundaries, hardware, timing procedure and unmeasured costs.
-Evaluation metric computation, reference processing, and offline inspection
-are separate from deployment latency and must not be included in it unless
-explicitly identified as a separate measurement. The measurement protocol
-and any interpolation baseline remain to be fixed before the experiments.
+\subsection{Feasibility Gates and Limitations}
+The first gate is acquiring a small training-scene sample under the
+dataset's research license and validating color, packed depth, EXR
+motion, camera JSON, corresponding frame IDs, and disk requirements.
+The second is an end-to-end baseline and aligned/unaligned warp pilot,
+including inspection at motion boundaries. The third is freezing
+the scene split, training budget, and metrics before final experiments.
+If the published files do not include independent normals, H2--H3
+and V2--V3/V8--V11 remain explicitly out of scope for QRISP.
+Any later custom-engine normals experiment would constitute a
+separate dataset/domain with new controls. Results obtained on QRISP
+would be specific to its Unity-rendered scenes and chosen capture
+conditions, not direct evidence of performance inside Unreal Engine.
 
 \section{Results}
 % TODO: Add tables, figures, run IDs, and uncertainty only after experiments.
 Results have not yet been collected.
 
-\subsection{Individual and Combined Geometric Inputs}
-% TODO: results not yet collected.
+\subsection{Geometric-Input Comparisons}
+% TODO: Record supported depth comparisons; normal effects only if independently available.
 
 \subsection{Temporal History and Alignment}
 % TODO: results not yet collected.
@@ -329,8 +430,8 @@ Results have not yet been collected.
 \section{Discussion}
 % TODO: Interpret effects and interactions, compare with cited work, and discuss limits.
 This section will interpret the analysis topics and their trade-offs, state
-whether hypotheses H1 to H5 were supported by the results, and discuss the
-limitations of the study.
+whether each \emph{tested} hypothesis was supported, identify conditional
+hypotheses not evaluated, and discuss the limitations of the study.
 
 \section{Conclusion}
 % TODO: Address the study objective using measured evidence.
