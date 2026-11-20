@@ -237,8 +237,9 @@ expectations before training:
 \item[H1] Depth improves single-frame reconstruction: V1$-$V0$\,>0$.
 \item[H2] Alignment improves temporal reconstruction both without and
 with depth: V5$-$V4$\,>0$ and V7$-$V6$\,>0$.
-\item[H3] Depth changes the alignment gain. We estimate the interaction
-(V7$-$V6)$-$(V5$-$V4) without prespecifying its sign.
+\item[H3] Depth changes the alignment gain. We estimate this
+depth-by-alignment interaction (Table~\ref{tab:contrasts}) without
+prespecifying its sign.
 \item[H4] The H1 and H2 effects have the same sign on each of the three
 held-out test scenes.
 \end{description}
@@ -253,16 +254,19 @@ establish effects for other architectures or quality metrics.
 Variant IDs follow Table~\ref{tab:variants}.}
 \label{tab:contrasts}
 \small
+\setlength{\tabcolsep}{4pt}
 \begin{tabular}{@{}lcc@{}}
 \hline
-Effect & Without depth & With depth \\
+ & \multicolumn{2}{c}{Current depth} \\
+Effect & absent & present \\
 \hline
 Add unaligned history & V4$-$V0 & V6$-$V1 \\
 Align that history    & V5$-$V4 & V7$-$V6 \\
 \hline
-\multicolumn{3}{@{}l}{Depth gain with no / unaligned / aligned history:}\\
-\multicolumn{3}{@{}l}{\quad V1$-$V0 \;/\; V6$-$V4 \;/\; V7$-$V5}\\
-\multicolumn{3}{@{}l}{Depth $\times$ alignment: (V7$-$V6)$-$(V5$-$V4)}\\
+Depth, no history        & \multicolumn{2}{c}{V1$-$V0} \\
+Depth, unaligned history & \multicolumn{2}{c}{V6$-$V4} \\
+Depth, aligned history   & \multicolumn{2}{c}{V7$-$V5} \\
+Depth $\times$ alignment & \multicolumn{2}{c}{(V7$-$V6)$-$(V5$-$V4)} \\
 \hline
 \end{tabular}
 \end{table}
@@ -414,8 +418,9 @@ Results have not yet been collected.
 \section{Discussion}
 % TODO: Interpret effects and interactions, compare with cited work, and discuss limits.
 This section will interpret the analysis topics and their trade-offs, state
-the magnitude and direction of the paired effects, state whether H1--H4
-were supported, and discuss the limitations of the study.
+the magnitude and direction of the paired effects and whether
+hypotheses H1--H4 were supported, and discuss the limitations of the
+study.
 
 \section{Conclusion}
 % TODO: Address the study objective using measured evidence.
