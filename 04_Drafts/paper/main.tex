@@ -194,62 +194,78 @@ counts with a manifest of scene, segment, frame, and modality paths,
 record gaps or exclusions, and keep all captures of each frame in one split.
 
 \subsection{Inputs and comparisons}
-Every model receives current RGB. Table~\ref{tab:variants} crosses the
-geometry available at the current frame with three ways to use the
-previous rendered LR RGB frame. Only that earlier RGB image is warped.
-Aligned models use the motion field during preprocessing. The CNN never
-receives raw motion or previous depth. All primary captures have jitter
-off, and all models have an empty recurrent state.
+Every model receives the current LR RGB frame. The variants differ in
+two factors: whether current-frame depth is supplied, and how the
+previous LR RGB frame is used---not at all, as stored (unaligned), or
+warped to the current frame with the rendered motion field (aligned).
+Warping is a preprocessing step applied only to that previous RGB image,
+so the CNN never receives raw motion vectors or previous depth.
+Crossing the two factors gives the six QRISP variants listed in
+Table~\ref{tab:variants}. All captures are unjittered, and no model
+carries a recurrent state from one frame to the next.
+
+\begin{table*}[t]
+\centering
+\caption{Input variants. Every model receives current LR RGB through the
+same ten-channel input layer; absent inputs are zero-filled. The six rows
+above the middle rule form the QRISP experiment. The rows below require
+independently rendered normals and are reserved for the extension in
+Section~\ref{sec:scope}.}
+\label{tab:variants}
+\begin{tabular}{@{}lcccl@{}}
+\hline
+ID & Depth & Normals & Previous LR RGB & Role \\
+\hline
+V0 & --  & -- & --        & Color-only baseline \\
+V1 & yes & -- & --        & Depth, single frame \\
+V4 & --  & -- & unaligned & History without alignment \\
+V5 & --  & -- & aligned   & Alignment without depth \\
+V6 & yes & -- & unaligned & History with depth \\
+V7 & yes & -- & aligned   & Alignment with depth \\
+\hline
+V2 / V8 / V9   & --  & yes & none / unaligned / aligned & Extension \\
+V3 / V10 / V11 & yes & yes & none / unaligned / aligned & Extension \\
+\hline
+\end{tabular}
+\end{table*}
+
+Table~\ref{tab:contrasts} lists the paired comparisons. Each entry is a
+difference in scene-balanced test PSNR between two variants, computed
+within each scene and seed and then averaged. We state the following
+expectations before training:
+\begin{description}
+\item[H1] Depth improves single-frame reconstruction: V1$-$V0$\,>0$.
+\item[H2] Alignment improves temporal reconstruction both without and
+with depth: V5$-$V4$\,>0$ and V7$-$V6$\,>0$.
+\item[H3] Depth changes the alignment gain. We estimate the interaction
+(V7$-$V6)$-$(V5$-$V4) without prespecifying its sign.
+\item[H4] The H1 and H2 effects have the same sign on each of the three
+held-out test scenes.
+\end{description}
+Hypotheses about surface normals, including whether depth and normals
+are partly redundant, belong to the extension. All contrasts describe
+this model at this upscaling factor, measured in PSNR; they do not
+establish effects for other architectures or quality metrics.
 
 \begin{table}[tb]
 \centering
-\caption{Variant IDs by current geometry and previous RGB treatment.
-The first two rows form the QRISP experiment. The last two are reserved
-for an extension with independently rendered normals.}
-\label{tab:variants}
+\caption{Planned paired contrasts in scene-balanced test PSNR (dB).
+Variant IDs follow Table~\ref{tab:variants}.}
+\label{tab:contrasts}
 \small
-\setlength{\tabcolsep}{4pt}
-\begin{tabular}{@{}lccc@{}}
+\begin{tabular}{@{}lcc@{}}
 \hline
- & \multicolumn{3}{c}{Previous LR RGB} \\
-Geometry & Absent & Unaligned & Aligned \\
+Effect & Without depth & With depth \\
 \hline
-None            & V0 & V4  & V5  \\
-Depth           & V1 & V6  & V7  \\
+Add unaligned history & V4$-$V0 & V6$-$V1 \\
+Align that history    & V5$-$V4 & V7$-$V6 \\
 \hline
-Normals         & V2 & V8  & V9  \\
-Depth + normals & V3 & V10 & V11 \\
+\multicolumn{3}{@{}l}{Depth gain with no / unaligned / aligned history:}\\
+\multicolumn{3}{@{}l}{\quad V1$-$V0 \;/\; V6$-$V4 \;/\; V7$-$V5}\\
+\multicolumn{3}{@{}l}{Depth $\times$ alignment: (V7$-$V6)$-$(V5$-$V4)}\\
 \hline
 \end{tabular}
 \end{table}
-
-Let $q_i$ denote the scene-balanced test PSNR in dB for variant $i$,
-averaged over matched seeds. Our directional expectations are that
-depth improves single-frame reconstruction ($q_1-q_0>0$) and alignment
-improves temporal reconstruction at each depth setting ($q_5-q_4>0$
-and $q_7-q_6>0$). We will estimate the change in alignment benefit
-$(q_7-q_6)-(q_5-q_4)$ without prespecifying its sign. The contrasts
-$q_4-q_0$ and $q_6-q_1$ measure adding unaligned history. Depth gains
-with unaligned and aligned history are $q_6-q_4$ and $q_7-q_5$.
-These comparisons concern this model and this quality scale.
-
-QRISP documents no independent normal buffer. For the full matrix,
-He et al.'s STSS captures pair 540p with 1080p and include rendered
-normals, depth, and motion \cite{he2024stss}. A switch would use
-supersampling frames only and verify the unwarped RGB history,
-motion convention, and scene split on that source. Zheng et al.'s
-Cycles data provide the same cues for a separate $4\times$ comparison
-\cite{zheng2025rdg}. In either case all geometry conditions and controls
-would be trained and scored within the selected dataset. Normals
-reconstructed from depth would test a different representation of depth.
-If jitter is studied, a small
-secondary comparison would retrain V4 and V5 on their matched jittered
-captures with the same mipmap bias, targets, splits, and seeds. The CNN
-would receive no offset channels in either condition. We would use the
-recorded offsets to verify the warp and correct for relative jitter only
-if the supplied vectors omit it. Comparing the two alignment gains then
-tests alignment under different sampling conditions. Learned recurrent
-features would require a separate stateful model and training protocol.
 
 \subsection{Model and alignment}
 Each variant has ten LR input channels in the same order (RGB, depth,
@@ -295,7 +311,7 @@ $10^{-3}$, betas $(0.9,0.999)$, $\epsilon=10^{-8}$, and weight decay
 keep the checkpoint with the highest equal-scene mean PSNR, choosing the
 earlier checkpoint on a tie. The six variants and three seeds require
 18 runs (360,000 updates). Before committing to this budget, we will
-pilot V0 and V7 in FP32 on the target 8-GB RTX~4060, record peak memory
+pilot V0 and V7 in FP32 on the target GPU, record peak memory
 and end-to-end updates per second, and project the total time including
 validation. Any adjustment to precision, batch size, or update count will
 apply to all runs and be recorded before the comparison begins. We will
@@ -352,6 +368,30 @@ transfers, and scene rendering are outside both timings. These measurements
 characterize offline reconstruction cost. An engine frame rate requires
 timing the integrated renderer.
 
+\subsection{Scope and extensions}
+\label{sec:scope}
+QRISP documents no independent normal buffer, so the normal variants
+(V2, V3, and V8--V11) require another source. He et al.'s STSS captures
+pair 540p with 1080p and include rendered normals, depth, and motion
+\cite{he2024stss}. Using STSS would mean taking its supersampling frames
+only and verifying the unwarped RGB history, motion convention, and
+scene split on that source. Zheng et al.'s Cycles data provide the same
+cues for a separate $4\times$ comparison \cite{zheng2025rdg}. With either
+source, all twelve variants, including the geometry-free controls, would
+be trained and scored within that dataset. Normals reconstructed from
+depth would not substitute for rendered normals; they would test another
+representation of depth.
+
+Jitter is a second possible extension. A small secondary comparison
+would retrain V4 and V5 on the matched jittered captures, keeping the
+mipmap bias, targets, splits, and seeds. In both conditions the CNN would
+receive no offset channels. We would use the recorded offsets to verify
+the warp, correcting for relative jitter only if the supplied motion
+vectors omit it. Comparing the alignment gain with and without jitter
+then tests alignment under different sampling conditions. Learned
+recurrent features are outside this study, since they would require a
+separate stateful model and training protocol.
+
 \section{Results}
 % TODO: Add tables, figures, run IDs, and uncertainty only after experiments.
 Results have not yet been collected.
@@ -374,8 +414,8 @@ Results have not yet been collected.
 \section{Discussion}
 % TODO: Interpret effects and interactions, compare with cited work, and discuss limits.
 This section will interpret the analysis topics and their trade-offs, state
-the magnitude and direction of the paired effects, and discuss the
-limitations of the study.
+the magnitude and direction of the paired effects, state whether H1--H4
+were supported, and discuss the limitations of the study.
 
 \section{Conclusion}
 % TODO: Address the study objective using measured evidence.

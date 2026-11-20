@@ -23,7 +23,7 @@ Combine terms from these groups; record exact queries as run.
 | 2026-11-19 | Web search | `Kasper Brandner Unreal real-time rendering super resolution ablation inputs normals motion depth warping temporal ablation thesis table G-buffer` | Top results | 8 | Codex |
 | 2026-11-19 | Web search | `"Low-latency Space-time Supersampling" dataset GitHub google drive dataset 540p G-buffers OpenSTSS or open source dataset` | Top results | 8 | Codex |
 
-These are representative queries from the targeted November refresh. Counts are the records returned for each listed query, with overlap. Follow-up checks used the full papers, Brandner's thesis, the authors' loaders and configurations, and the STSS split and frame manifests. The [experiment plan](../05_Experiments/EXPERIMENT_PLAN.md) records the dataset comparison and outstanding file-level checks.
+The Brandner query uses the author's GitHub handle (BrandnerKasper); the thesis author is Tobias Brandner, as in `references.bib`. These are representative queries from the targeted November refresh. Counts are the records returned for each listed query, with overlap. Follow-up checks used the full papers, Brandner's thesis, the authors' loaders and configurations, and the STSS split and frame manifests. The [experiment plan](../05_Experiments/EXPERIMENT_PLAN.md) records the dataset comparison and outstanding file-level checks.
 
 ## Eligibility criteria (draft; agree before screening)
 
