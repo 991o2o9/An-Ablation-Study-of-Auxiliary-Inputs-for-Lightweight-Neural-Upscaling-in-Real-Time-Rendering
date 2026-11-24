@@ -44,7 +44,7 @@ Current RGB is always present. The column describes only the immediately precedi
 | Normals | V2 | V8 | V9 | Separate extension |
 | Depth and normals | V3 | V10 | V11 | Separate extension |
 
-The matrix retains PR #5’s IDs. The earlier seven-variant proposal’s V6 maps to V11 here. Identify runs by protocol revision as well as variant. Independent normals would require matching captures and same-source controls for every comparison. Depth-derived normals would answer a different question about depth encoding.
+**ID change from the earlier seven-variant table.** V0–V5 keep their earlier meanings. The earlier V6 (depth + normals + aligned history) is **V11** here, and **V6 now means depth + unaligned history**. Do not compare results labelled V6 across protocol revisions; identify runs by protocol revision as well as variant. Independent normals would require matching captures and same-source controls for every comparison. Depth-derived normals would answer a different question about depth encoding.
 
 | Quantity (scene-balanced PSNR in dB) | Matched contrast |
 |---|---|
@@ -53,9 +53,16 @@ The matrix retains PR #5’s IDs. The earlier seven-variant proposal’s V6 maps
 | Benefit of alignment without / with depth | V5 − V4 / V7 − V6 |
 | Change in alignment benefit when depth is present | (V7 − V6) − (V5 − V4) |
 
-The directional expectations are positive single-frame depth gain and positive alignment gain at both depth settings. Estimate the interaction in either direction. Compute each difference within the same scene and seed before averaging.
+Compute each difference within the same scene and seed before averaging. The manuscript states the expectations as H1–H4:
 
-Jitter is off for every core row. A secondary experiment could retrain V4 and V5 using the jittered versions of all corresponding LR buffers, the same Enhanced target, splits and seeds. Compare the alignment gain against the non-jittered gain. The CNN receives no explicit offset channels. Check relative jitter in the motion field before applying any correction. Learned intermediate CNN activations exist in every model. A recurrent feature buffer exists in none of them.
+- **H1:** depth improves single-frame reconstruction (V1 − V0 > 0).
+- **H2:** alignment improves temporal reconstruction without and with depth (V5 − V4 > 0 and V7 − V6 > 0).
+- **H3:** depth changes the alignment gain; estimate (V7 − V6) − (V5 − V4) without prespecifying its sign.
+- **H4:** the H1 and H2 effects have the same sign on each of the three test scenes.
+
+The earlier hypotheses about normals (normals improve quality; depth and normals are partly redundant) move to the normal extension.
+
+Jitter is off for every core row. A secondary experiment could retrain V4 and V5 using the jittered versions of all corresponding LR buffers, the same Enhanced target, splits and seeds. Compare the alignment gain against the non-jittered gain. The CNN receives no explicit offset channels. Check relative jitter in the motion field before applying any correction. No model carries a recurrent state between frames.
 
 ## Preparation and training
 
@@ -64,7 +71,7 @@ Jitter is off for every core row. A secondary experiment could retrain V4 and V5
 3. Decode vertical then horizontal EXR velocities and scale by the corresponding LR dimension. Verify axis sign and current-to-previous source coordinates using trackable training-scene motion. Test identity and one-pixel translations on a synthetic grid. Bilinearly sample full-frame previous RGB with half-pixel centers and replicated borders before cropping. Supply no motion-derived mask, depth dilation or raw velocity channels to the CNN.
 4. Use the ten-slot, 32-channel residual CNN specified in the manuscript (four blocks, PixelShuffle 2× and a bilinear RGB skip). Omitted slots contain zeros. Draw eligible training pairs uniformly with replacement, then a uniform valid 64×64 LR crop and its corresponding 128×128 HR target. Save the draws and use identical initial weights and draws across variants for each of seeds 17, 29 and 43.
 5. Train independently using mean L1 on unclipped output, AdamW at constant 0.001, betas (0.9, 0.999), epsilon 1e−8 and weight decay 0.01. Proposed batch size is eight, with 20,000 updates and full validation every 1,000. Select the highest mean validation-scene PSNR with ties going to the earlier checkpoint.
-6. Pilot both V0 and V7 in FP32 on the 8-GB RTX 4060 to include the cost of motion I/O, warping and validation. For each pilot record peak allocated memory, updates/s, validation wall time and I/O/cache settings. Estimate time for 18 training runs (360,000 updates plus 360 validation passes). Apply any resource-driven budget or precision adjustment to every variant before final training.
+6. Pilot both V0 and V7 in FP32 on the target GPU to include the cost of motion I/O, warping and validation. Record the GPU model with the pilot results rather than in the protocol. For each pilot record peak allocated memory, updates/s, validation wall time and I/O/cache settings. If the pilot can afford it, train V0 with all three seeds to estimate the seed-to-seed spread in validation PSNR (see the open decision on power below). Estimate time for 18 training runs (360,000 updates plus 360 validation passes). Apply any resource-driven budget or precision adjustment to every variant before final training.
 
 ## Evaluation and reporting
 
@@ -74,3 +81,21 @@ Jitter is off for every core row. A secondary experiment could retrain V4 and V5
 - Show scene-by-seed values, matched contrasts, and the mean and range across seeds. Report all three scenes individually. Do not treat adjacent frames as independent replicates.
 - Time full-frame batch-one inference and the resident-buffer pipeline separately. The pipeline includes input assembly, any motion conversion and warping, network execution and clipping. Report CUDA-event median and p95 across 200 fixed frames after 50 warm-ups, peak allocated memory after a warm-up reset, and the GPU, driver, software and precision. Measure each pipeline in isolation. Disk, CPU transfers, rendering and quality metrics are outside these timings.
 - Save run IDs, Git SHA, input hashes, split/crop manifests, environment, validation trace, selected checkpoint and raw frame-level scores alongside the summaries. Offline timings do not establish an in-engine frame rate.
+
+## Open decisions
+
+The protocol above is proposed, not frozen. Both authors agree on each row before the first full run.
+
+| Decision | Current proposal | Question for the authors | Status |
+|---|---|---|---|
+| Validation size | Whole SciFiBase family (82 of 247 development segments; 2,378 validation vs 4,640 training pairs) | Is a validation set half the size of training justified, given only seven training environments? Alternative: a smaller held-out family or a subset of SciFiBase segments. | Open |
+| Seeds and decision rule | Three seeds; report mean and range | Prior effects are ~0.04 dB (Brandner Table 5.5 alignment; RDG Table 3 depth). Measure seed spread in the pilot, then fix when an expectation counts as supported (e.g. same sign in all nine scene×seed cells, or a stated interval). | Open |
+| Depth-edge threshold | 90th percentile of absolute LR depth difference, pooled over training pixels | Normalised near-to-far depth depends on each scene's clip planes, so pooled coverage may vary strongly by scene. Consider a relative difference (abs Δd / d) or a per-scene percentile. | Open |
+| Perceptual metric | None (PSNR, SSIM, masked MAE, temporal error) | FLIP and LPIPS were in the previous evaluation plan. Mercier et al. report LPIPS on QRISP, so omitting it limits comparison with their baselines. State the reason or reinstate one as secondary. | Open |
+| Target GPU | Not named in the protocol | Recorded with pilot and final measurements. | Agreed (commit ba9099e) |
+| Training budget and precision | 20,000 updates, batch 8, FP32 | Confirm after the V0/V7 pilot. | Pending pilot |
+| Dataset | QRISP six-variant protocol | Switch to STSS for the full twelve-variant matrix after the STSS pilot? | Pending pilot |
+
+## Gate before the first full run
+
+Write and jointly review the reproducibility record: configuration format, Git commit, seeds, data version and split manifest, GPU and software versions, timing method including warm-up, metric implementations, checkpoint location and result naming. Close every row of the open-decisions table first.
