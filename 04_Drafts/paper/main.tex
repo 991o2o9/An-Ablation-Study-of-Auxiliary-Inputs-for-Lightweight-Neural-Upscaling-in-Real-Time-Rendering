@@ -68,15 +68,15 @@ miss thin-object artifacts \cite{mercier2023efficient}. These findings
 identify useful inputs and evaluation concerns, but their effects depend on
 the model, rendering setup, and processing used for each comparison.
 
-We plan a controlled study of auxiliary inputs for a lightweight neural
-upscaler. Under a shared experimental protocol, we intend to compare depth
-and normals individually and together, then compare unaligned with
-motion-aligned history and examine the joint addition of depth and normals
-to aligned history. We will assess reconstruction quality alongside measured
-runtime and memory costs, variation across held-out scenes, and spatial
-failure cases. This is a proposed comparison within a specific setup, not a
-claim that input or alignment ablations are new. The architecture, data, and
-measurement boundaries remain to be fixed before experiments.
+We propose a controlled study of auxiliary inputs for a lightweight neural
+upscaler using Mercier et al.'s QRISP dataset
+\cite{mercier2023efficient}. Our primary comparisons isolate depth and
+motion-alignment effects on matched current-frame and single-history
+inputs, with reconstruction quality, runtime, memory, and scene-level
+variation evaluated under one protocol. Surface-normal comparisons remain
+conditional because QRISP does not document a surface-normal modality.
+The paired comparisons estimate how depth changes the benefit of
+alignment in this model.
 
 \section{Background and Related Work}
 \subsection{Efficient Neural Reconstruction}
@@ -104,13 +104,16 @@ model size \cite{wen2025cgsr}. This is an existing rendering-input ablation,
 but its sequential design and network optimization couple input choice to
 changes in capacity.
 
-Zheng et al.\ place normals and material information in a detail-reconstruction
-module, while depth and motion constrain temporal feature refinement
-\cite{zheng2025rdg}. Their ablations compare decoupled guidance against
-concatenation and alternative fusion modules. They show that the way signals
-are combined matters, rather than isolating each buffer's contribution.
-Together, these studies motivate examining depth and normals individually
-and together while distinguishing input choice from fusion design.
+Zheng et al.\ remove individual buffers from RDG-s. At $4\times$,
+its mean PSNR falls from 29.37 to 29.27 dB without normals, to
+29.33 dB without depth, and to 29.00 dB when motion alignment is
+disabled \cite[Table~3]{zheng2025rdg}. Each removal is measured with
+the other cues present. The all-buffers-off row also removes the
+material input, so it cannot supply the missing depth-by-alignment
+comparison. Wang et al.\ likewise ablate individual geometry channels
+at output resolution \cite{wang2025taming}. The resolution of a buffer
+matters here: an HR silhouette can supply edge locations unavailable to
+a network receiving geometry only on the LR grid.
 
 \subsection{Temporal History, Alignment, and Failure Cases}
 Temporal history can supply samples missing from the current frame, provided
@@ -137,182 +140,268 @@ LPIPS, although their thin-object example favors dilation
 \cite{mercier2023efficient}. Such cases make localized artifacts relevant to
 interpreting reconstruction quality, even when aggregate scores improve.
 
-Taken together, these studies motivate examining renderer-provided geometry
-and temporal history in relation to both reconstruction quality and
-computational cost. Prior work already includes input and alignment
-ablations, but their effects depend on model design, fusion, and rendering
-conditions. Our study aims to clarify these trade-offs in a selected
-lightweight model and rendering setup.
+Brandner's master's thesis crosses access to a bundle of G-buffers with
+forward warping of two previous frames. On the Egypt overview sequence,
+warping improves PSNR by 0.04 dB at either buffer setting to the precision
+reported \cite[Table~5.5]{brandner2024urtsr}. This directly anticipates
+the crossed design. Our experiment asks which part of that relationship
+can be attributed to current LR depth alone, using one previous RGB
+frame and the same CNN across scene and seed comparisons. A recent
+preprint also shows that registration can change the effect of a
+temporal loss in a recurrent supersampler \cite{yu2026frozen}. We
+restrict the core comparison to a framewise loss and an explicitly
+checked warp.
 
 \section{Method}
-\subsection{Study Design and Analysis Topics}
-We plan to study a color-only single-frame baseline (V0) and three spatial
-variants that add depth (V1), normals (V2), or both (V3). A planned temporal
-extension adds unaligned history to color (V4), aligns that history using
-motion vectors (V5), and adds depth and normals together to aligned history
-(V6). Table~\ref{tab:variants} summarizes the proposed inputs. The temporal
-model and the representation of history remain to be selected.
+\label{sec:method}
+We ask whether current-frame depth helps a small upscaler, whether one
+previous RGB frame helps, and whether the benefit of aligning that frame
+depends on access to depth. We propose the following protocol for an
+offline experiment on Unity-rendered sequences. Training and evaluation
+are pending.
+
+\subsection{Data and scene split}
+We will pair QRISP's non-jittered $960\times540$ RGB render (mipmap bias
+$-1$) with the same frame's $1920\times1080$ Enhanced target. This target
+comes from a 2160p render with eight-sample MSAA. The matched 540p depth
+and motion buffers supply the auxiliary inputs
+\cite[Supplement, Annex~A]{mercier2023efficient}.
+We will use stored RGB code values divided by 255, discard color alpha,
+and apply no further exposure or transfer function. For depth, the four
+unsigned PNG bytes give
+$D=R/255+G/255^2+B/255^3+A/255^4$.
+We will check the decoded range on training captures and use the
+documented near-to-far encoding directly. The 1080p target contributes
+only to supervision and scoring.
+
+QRISP has ten development scenes and three published test scenes. We
+propose holding the entire SciFiBase environment family for validation:
+SciFiBase, ScifiBaseStartStop, and ScifiBaseNightStartStop. This retains
+moving and stop-containing captures in validation and keeps alternate
+views of that environment together. The other seven development scenes
+supply training data. This grouping separates environments, although
+individual assets can recur across splits. Validation selects checkpoints;
+the official test scenes (AbandonedSchool, SpaceShipDemo, and Seaport)
+enter only the final evaluation.
+
+The sampling unit is a current frame with its consecutive predecessor
+in the same segment. All models, including the single-frame baselines,
+use the same eligible current frames for training and scoring. Removing
+one initial frame per segment gives expected counts of 4,640 training,
+2,378 validation, and 1,495 test pairs from the published segment lengths
+\cite[Supplement, Table~5]{mercier2023efficient}. We will reconcile these
+counts with a manifest of scene, segment, frame, and modality paths,
+record gaps or exclusions, and keep all captures of each frame in one split.
+
+\subsection{Inputs and comparisons}
+Every model receives the current LR RGB frame. The variants differ in
+two factors: whether current-frame depth is supplied, and how the
+previous LR RGB frame is used---not at all, as stored (unaligned), or
+warped to the current frame with the rendered motion field (aligned).
+Warping is a preprocessing step applied only to that previous RGB image,
+so the CNN never receives raw motion vectors or previous depth.
+Crossing the two factors gives the six QRISP variants listed in
+Table~\ref{tab:variants}. All captures are unjittered, and no model
+carries a recurrent state from one frame to the next.
 
 \begin{table*}[t]
 \centering
-\caption{Planned input variants (V0 is the color-only baseline).}
+\caption{Input variants. Every model receives current LR RGB through the
+same ten-channel input layer; absent inputs are zero-filled. The six rows
+above the middle rule form the QRISP experiment. The rows below require
+independently rendered normals and are reserved for the extension in
+Section~\ref{sec:scope}.}
 \label{tab:variants}
-\begin{tabular}{llcccc}
+\begin{tabular}{@{}lcccl@{}}
 \hline
-ID & Group & Color & Depth & Normals & History \\
+ID & Depth & Normals & Previous LR RGB & Role \\
 \hline
-V0 & Single frame & yes & -- & -- & -- \\
-V1 & Single frame & yes & yes & -- & -- \\
-V2 & Single frame & yes & -- & yes & -- \\
-V3 & Single frame & yes & yes & yes & -- \\
-V4 & Temporal & yes & -- & -- & unaligned \\
-V5 & Temporal & yes & -- & -- & motion aligned \\
-V6 & Temporal & yes & yes & yes & motion aligned \\
+V0 & --  & -- & --        & Color-only baseline \\
+V1 & yes & -- & --        & Depth, single frame \\
+V4 & --  & -- & unaligned & History without alignment \\
+V5 & --  & -- & aligned   & Alignment without depth \\
+V6 & yes & -- & unaligned & History with depth \\
+V7 & yes & -- & aligned   & Alignment with depth \\
+\hline
+V2 / V8 / V9   & --  & yes & none / unaligned / aligned & Extension \\
+V3 / V10 / V11 & yes & yes & none / unaligned / aligned & Extension \\
 \hline
 \end{tabular}
 \end{table*}
 
-\paragraph{Individual and combined geometric inputs.}
-V1 versus V0 estimates the effect of depth, and V2 versus V0 estimates the
-effect of normals, subject to the capacity and processing controls below.
-V3 versus V1 estimates the incremental effect of normals with depth, while
-V3 versus V2 estimates the incremental effect of depth with normals.
-Together, these comparisons can examine overlap between their contributions
-in the single-frame setting.
-
-\paragraph{Temporal history and alignment.}
-V4 versus V0 examines adding unaligned history, with any differences in
-temporal processing taken into account. V5 versus V4 tests motion alignment
-provided that history and temporal processing are otherwise matched. V6
-versus V5 tests adding depth and normals together to aligned history; V6
-versus V3 compares the combined temporal and single-frame variants. These
-comparisons do not isolate the separate effects of depth and normals with
-aligned history, motion vectors without history, or every interaction among
-the inputs.
-
-\paragraph{Quality, cost, and generalization.}
-We plan to compare reconstruction quality with the selected runtime and
-memory measurements. Training, validation, and test scenes will be disjoint
-at the scene level; test frames will not be used for fitting or protocol
-selection. We will examine whether variant differences persist across
-held-out scenes and how they vary among them. An unseen scene does not by
-itself establish a distribution shift.
-
-\paragraph{Spatial benefits and failures.}
-Alongside aggregate quality, we plan to inspect where variants help or hurt,
-including geometric edges, thin structures, and regions newly revealed by
-motion. Error maps and selected image regions can expose local effects that
-may be obscured in whole-image averages.
-
-\paragraph{Hypotheses.}
-The following are expectations to be assessed after experiments; they may be
-supported or refuted.
+Table~\ref{tab:contrasts} lists the paired comparisons. Each entry is a
+difference in scene-balanced test PSNR between two variants, computed
+within each scene and seed and then averaged. We state the following
+expectations before training:
 \begin{description}
-\item[H1] Adding depth improves quality over color-only input.
-\item[H2] Adding surface normals improves quality over color-only input.
-\item[H3] Depth and normals are partly redundant, so using both improves
-quality by less than the sum of their individual gains.
-\item[H4] History warped with motion vectors improves quality over history
-used without alignment.
-\item[H5] Improvements of selected auxiliary-input variants over their
-matched baselines persist on scene-disjoint test scenes.
+\item[H1] Depth improves single-frame reconstruction: V1$-$V0$\,>0$.
+\item[H2] Alignment improves temporal reconstruction both without and
+with depth: V5$-$V4$\,>0$ and V7$-$V6$\,>0$.
+\item[H3] Depth changes the alignment gain. We estimate this
+depth-by-alignment interaction (Table~\ref{tab:contrasts}) without
+prespecifying its sign.
+\item[H4] The H1 and H2 effects have the same sign on each of the three
+held-out test scenes.
 \end{description}
+Hypotheses about surface normals, including whether depth and normals
+are partly redundant, belong to the extension. All contrasts describe
+this model at this upscaling factor, measured in PSNR; they do not
+establish effects for other architectures or quality metrics.
 
-\paragraph{Controls and interpretation.}
-We plan to use a shared base architecture while varying inputs. A shared
-design does not imply identical parameter counts: input channel changes
-affect the first layer, and temporal variants may require additional
-processing. Training data, loss, optimizer, and schedule should be held
-constant where applicable. We plan multiple random seeds, with the number to
-be determined. We will report parameter counts and computational complexity,
-and control capacity where feasible, for example by matching parameter
-budgets. Any remaining differences in capacity or processing will be
-acknowledged when interpreting quality and cost. The architecture, temporal
-implementation, and final protocol remain to be fixed.
-The cited prior systems are methodological references, not implemented
-experimental baselines; any comparator beyond V0 remains undecided.
+\begin{table}[tb]
+\centering
+\caption{Planned paired contrasts in scene-balanced test PSNR (dB).
+Variant IDs follow Table~\ref{tab:variants}.}
+\label{tab:contrasts}
+\small
+\setlength{\tabcolsep}{4pt}
+\begin{tabular}{@{}lcc@{}}
+\hline
+ & \multicolumn{2}{c}{Current depth} \\
+Effect & absent & present \\
+\hline
+Add unaligned history & V4$-$V0 & V6$-$V1 \\
+Align that history    & V5$-$V4 & V7$-$V6 \\
+\hline
+Depth, no history        & \multicolumn{2}{c}{V1$-$V0} \\
+Depth, unaligned history & \multicolumn{2}{c}{V6$-$V4} \\
+Depth, aligned history   & \multicolumn{2}{c}{V7$-$V5} \\
+Depth $\times$ alignment & \multicolumn{2}{c}{(V7$-$V6)$-$(V5$-$V4)} \\
+\hline
+\end{tabular}
+\end{table}
 
-\subsection{Model, Inputs, and Data}
-% TODO: Specify architecture, input preprocessing, scenes, splits, resolution, and scale.
-The architecture, input preprocessing, scenes, resolution, and upscaling
-factor are to be selected. The training, validation, and test scene lists
-and the method for producing aligned or unaligned history will be fixed
-before any experiments are run.
+\subsection{Model and alignment}
+Each variant has ten LR input channels in the same order (RGB, depth,
+three reserved normals, previous RGB). Missing inputs are zero. A
+$3\times3$ convolution maps ten channels to 32, followed by ReLU. Four
+residual blocks each add the output of two $3\times3$, 32-channel
+convolutions to their input, with ReLU between the convolutions. A final
+$3\times3$ convolution produces 12 channels. A $2\times$ pixel shuffle
+rearranges them into an HR RGB residual, which we add to bilinearly
+upsampled current RGB (half-pixel centers). All convolutions have bias,
+unit stride, and one-pixel zero padding. There is no normalization layer.
+Each model has 80,364 trainable parameters. Input slots held at zero
+contribute no signal even though the dense network has the same size.
 
-\subsection{Evaluation Protocol}
+For aligned history, let $d_t(p)$ be displacement from current LR pixel
+center $p$ to its source in the preceding image. We bilinearly sample
+the previous RGB at $p+d_t(p)$ over the full frame before taking a
+training crop. QRISP stores vertical then horizontal velocity. Decoding
+requires scaling by height and width, respectively, and reconciling
+Unity's vertical axis with image rows
+\cite[Supplement, Annex~A]{mercier2023efficient}.
+On training data we will verify the backward mapping against identifiable
+moving points, and check identity and known one-pixel translations on a
+synthetic grid. We will record the tested conversion. Sampling uses
+half-pixel centers and border replication. We use the published motion
+field without depth dilation, an occlusion mask, or a learned confidence
+channel. Unaligned variants read the original previous RGB at $p$.
+Disoccluded regions and overlays remain in the quality scores, including
+UI elements that lack corresponding motion or depth.
+
+\subsection{Training and checkpoint selection}
+For each seed (17, 29, 43), all six models start from the same initial
+weights and train independently. We draw an eligible training pair
+uniformly with replacement, then draw an integer crop origin uniformly
+over valid $64\times64$ LR patches. The HR crop starts at twice that
+origin and spans $128\times128$ pixels. The seed fixes the same list of
+pairs and crops for every variant. We use cropping alone for augmentation.
+
+We propose 20,000 updates per run, batch size eight, and mean absolute
+RGB error on the unclipped prediction. AdamW uses constant learning rate
+$10^{-3}$, betas $(0.9,0.999)$, $\epsilon=10^{-8}$, and weight decay
+0.01. Every 1,000 updates we score full eligible validation frames and
+keep the checkpoint with the highest equal-scene mean PSNR, choosing the
+earlier checkpoint on a tie. The six variants and three seeds require
+18 runs (360,000 updates). Before committing to this budget, we will
+pilot V0 and V7 in FP32 on the target GPU, record peak memory
+and end-to-end updates per second, and project the total time including
+validation. Any adjustment to precision, batch size, or update count will
+apply to all runs and be recorded before the comparison begins. We will
+save split and crop manifests, source checksums, seeds, package versions,
+Git revision, checkpoints, and validation curves.
+
+\subsection{Evaluation}
 \label{sec:metrics}
-The following evaluation choices are provisional until the image pipeline and
-protocol are fixed. No measurements have yet been made. We propose PSNR and
-SSIM for reference-image reconstruction: PSNR summarizes pixel error, while
-SSIM compares local image structure \cite{wang2004ssim}. Neither establishes
-perceptual quality or temporal stability on its own.
+We will score full frames in the stored RGB encoding, including image
+borders, after clipping predictions to $[0,1]$. The primary metric is
+$10\log_{10}(1/\mathrm{MSE})$ using one MSE over all RGB values in
+each frame. We average frame PSNRs within each scene, then weight the
+three test scenes equally. We will show each scene's paired differences
+for the three matched seeds and report the mean and range across seeds.
+The three scenes constrain claims about other environments. Bicubic
+interpolation of current RGB provides a non-neural reference using the
+same pixel-center convention and scoring rules. Secondary SSIM uses
+an $11\times11$ Gaussian window ($\sigma=1.5$), range one, standard
+constants $K_1=0.01$, $K_2=0.03$, population covariance and valid windows,
+averaged over channels \cite{wang2004ssim}.
 
-For spatial analysis, FLIP is a candidate for perceptually motivated
-reference-image error maps \cite{andersson2020flip}. If evaluation uses
-low-dynamic-range (LDR) images, LDR-FLIP applies to the chosen display-ready
-images. If the study evaluates high-dynamic-range (HDR) images, HDR-FLIP is a
-distinct method that combines maps over exposure-compensated, tone-mapped
-image pairs \cite{andersson2021hdrflip}. The choice depends on the final
-pipeline. FLIP maps indicate estimated visible differences; they do not
-prove human preferences. LPIPS is an optional complementary learned-feature
-distance \cite{zhang2018lpips}, rather than a required metric: its additional
-value for these rendered images should be established before inclusion, and
-its score does not establish human preference. Framewise FLIP and LPIPS do
-not establish temporal stability.
+To check whether an image-wide average hides a depth benefit near
+silhouettes, we will also report paired mean absolute RGB error within
+and away from depth discontinuities. At each LR pixel we compute the
+largest absolute depth difference to its in-bounds four-connected
+neighbors. We fix the threshold at the 90th percentile across eligible
+training pixels and mark test pixels strictly above it. Each LR label
+covers its corresponding $2\times2$ HR pixels. All variants use the
+same evaluation mask. We report pixel coverage and scene-level results
+for both regions. This mask measures changes in screen-space depth;
+it does not identify visibility changes between frames.
 
-We will select representative crops and sequences illustrating geometric
-edges, thin structures, and disocclusions, including cases where inputs help
-or hurt. Such examples are descriptive. Any systematic regional comparison
-requires independently defined masks, a selection rule fixed before test
-analysis, and reporting the number and coverage of regions; if reliable
-masks cannot be defined, we will not treat selected crops as regional
-statistics. Metric maps near mask boundaries may depend on context outside
-the region.
+To describe temporal behavior, we will also report the mean absolute
+difference between successive output changes and reference changes in
+screen coordinates, computed on evaluation RGB:
+$\left|(\hat I_t-\hat I_{t-1})-(I_t-I_{t-1})\right|$.
+This requires two consecutive scored frames in the same segment. We will
+use the same scene weighting and inspect synchronized reference and
+output clips for moving silhouettes, newly visible regions, and UI.
+This statistic measures error in frame changes and can respond to
+ordinary reconstruction errors on moving edges. We will interpret it
+alongside spatial quality and clips.
 
-Temporal stability requires a separate sequence-level assessment. As a
-provisional quantitative option, we may examine temporal variation on
-verified static segments, alongside the reference sequence; Mercier et al.\
-use pixel-wise temporal standard deviation on a static scene segment
-\cite{mercier2023efficient}. This can reveal flicker in that restricted
-setting but does not characterize moving content, and a stable blurred output
-may score well. We also plan synchronized reference/output video inspection
-for moving scenes, including disocclusions, using predeclared selection and
-playback conditions. A motion-compensated temporal error may be considered
-if reliable correspondences and visibility masks are available: its motion
-source, warping and exclusions must be fixed independently of the variants.
-Warping errors, occlusion, lighting changes, and blur can confound the result;
-excluded pixels and coverage must be reported. Neither this measure nor
-selected videos alone would establish general temporal perceptual quality.
+We will time batch-one, full-frame inference at $1920\times1080$ output
+in evaluation mode on the same GPU and precision. With decoded buffers
+resident on device, we will report network-only time and time from
+separate buffers to clipped HR output, including input assembly and
+any motion conversion and warp. We will use CUDA events, 50 warm-up
+frames and 200 timed frames from a fixed sequence, synchronize before
+reading the events, and report median and 95th percentile. We will
+reset peak allocated-memory statistics after warm-up and report peak
+allocated GPU memory for each pipeline in isolation. Disk I/O, host
+transfers, and scene rendering are outside both timings. These measurements
+characterize offline reconstruction cost. An engine frame rate requires
+timing the integrated renderer.
 
-Before testing, the protocol must specify implementation and version for
-each measure; reference alignment, frame synchronization, resolution and
-cropping; color space, transfer function, range, exposure and tone mapping;
-and the treatment of invalid pixels. For PSNR, specify peak value, channels,
-and whether aggregation precedes or follows the logarithm; for SSIM, specify
-window, scale, channels and range. For FLIP, specify the LDR or HDR variant,
-display and viewing assumptions, map pooling, and, for HDR, exposure and
-tone-mapping settings. If LPIPS is used, specify its backbone, weights, input
-normalization and pooling. For temporal assessment, specify static-segment
-criteria, frame rate, duration, reset handling and any correspondence and
-masking procedure. Fix aggregation across pixels, frames, sequences, scenes,
-and seeds; report per-scene results and the weighting used for summaries.
-These choices must apply consistently to the variants.
+\subsection{Scope and extensions}
+\label{sec:scope}
+QRISP documents no independent normal buffer, so the normal variants
+(V2, V3, and V8--V11) require another source. He et al.'s STSS captures
+pair 540p with 1080p and include rendered normals, depth, and motion
+\cite{he2024stss}. Using STSS would mean taking its supersampling frames
+only and verifying the unwarped RGB history, motion convention, and
+scene split on that source. Zheng et al.'s Cycles data provide the same
+cues for a separate $4\times$ comparison \cite{zheng2025rdg}. With either
+source, all twelve variants, including the geometry-free controls, would
+be trained and scored within that dataset. Normals reconstructed from
+depth would not substitute for rendered normals; they would test another
+representation of depth.
 
-Possible deployment costs include neural inference latency and GPU memory
-consumption, as well as buffer preparation, history warping and storage,
-data transfers, and total upscaling-pipeline time. The protocol must define
-measurement boundaries, hardware, timing procedure and unmeasured costs.
-Evaluation metric computation, reference processing, and offline inspection
-are separate from deployment latency and must not be included in it unless
-explicitly identified as a separate measurement. The measurement protocol
-and any interpolation baseline remain to be fixed before the experiments.
+Jitter is a second possible extension. A small secondary comparison
+would retrain V4 and V5 on the matched jittered captures, keeping the
+mipmap bias, targets, splits, and seeds. In both conditions the CNN would
+receive no offset channels. We would use the recorded offsets to verify
+the warp, correcting for relative jitter only if the supplied motion
+vectors omit it. Comparing the alignment gain with and without jitter
+then tests alignment under different sampling conditions. Learned
+recurrent features are outside this study, since they would require a
+separate stateful model and training protocol.
 
 \section{Results}
 % TODO: Add tables, figures, run IDs, and uncertainty only after experiments.
 Results have not yet been collected.
 
-\subsection{Individual and Combined Geometric Inputs}
-% TODO: results not yet collected.
+\subsection{Geometric-Input Comparisons}
+% TODO: Record supported depth comparisons; normal effects only if independently available.
 
 \subsection{Temporal History and Alignment}
 % TODO: results not yet collected.
@@ -329,8 +418,9 @@ Results have not yet been collected.
 \section{Discussion}
 % TODO: Interpret effects and interactions, compare with cited work, and discuss limits.
 This section will interpret the analysis topics and their trade-offs, state
-whether hypotheses H1 to H5 were supported by the results, and discuss the
-limitations of the study.
+the magnitude and direction of the paired effects and whether
+hypotheses H1--H4 were supported, and discuss the limitations of the
+study.
 
 \section{Conclusion}
 % TODO: Address the study objective using measured evidence.
